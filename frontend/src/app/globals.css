@@ -3,25 +3,82 @@
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+  /* Palantir-inspired dark theme */
+  --bg-primary: #0D1117;
+  --bg-surface: #161B22;
+  --bg-elevated: #1C2128;
+  --border-color: #30363D;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --accent-blue: #58A6FF;
+  --accent-cyan: #39D5FF;
+  --status-green: #3FB950;
+  --status-yellow: #D29922;
+  --status-red: #F85149;
+
+  --text-primary: #E6EDF3;
+  --text-secondary: #8B949E;
+  --text-muted: #6E7681;
 }
 
 body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
 }
 
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
+/* Override Blueprint defaults */
+.bp5-dark {
+  background: var(--bg-primary);
+}
+
+/* Sharp corners - NO border-radius */
+.bp5-card,
+.bp5-button,
+.bp5-tag,
+.bp5-input,
+.bp5-menu {
+  border-radius: 0 !important;
+}
+
+/* Monospace numbers */
+.mono-num {
+  font-family: var(--font-geist-mono), 'JetBrains Mono', 'Fira Code', monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Data table styling */
+.bp5-html-table {
+  width: 100%;
+}
+
+.bp5-html-table th,
+.bp5-html-table td {
+  border-color: var(--border-color) !important;
+}
+
+.bp5-html-table-striped tbody tr:nth-child(odd) td {
+  background: var(--bg-surface) !important;
+}
+
+/* Card styling */
+.bp5-card {
+  background: var(--bg-surface) !important;
+  border: 1px solid var(--border-color) !important;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
 }
