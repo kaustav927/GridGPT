@@ -1,0 +1,72 @@
+.card {
+  background: var(--bg-surface) !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: 0 !important;
+  padding: 20px !important;
+}
+
+.header {
+  margin: 0 0 16px 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--text-primary);
+}
+
+.loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 200px;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sectionHeader {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.generatorRow {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  background: var(--bg-primary);
+  border-radius: 0;
+  height: 70px;
+}
+
+.generatorInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  justify-content: center;
+  width: 130px;
+  flex-shrink: 0;
+}
+
+.generatorName {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.generatorOutput {
+  font-size: 10px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.sparkline {
+  flex: 1;
+  background: var(--bg-surface);
+  border-radius: 0;
+  min-width: 0;
+}

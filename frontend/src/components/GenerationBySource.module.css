@@ -1,0 +1,38 @@
+.card {
+  background: var(--bg-surface) !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: 0 !important;
+  padding: 20px !important;
+}
+
+.header {
+  margin: 0 0 16px 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--text-primary);
+}
+
+.loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 200px;
+}
+
+.table {
+  width: 100%;
+  font-size: 11px;
+}
+
+.table th {
+  font-size: 10px;
+  color: var(--text-secondary);
+  font-weight: normal;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.table td {
+  font-family: 'JetBrains Mono', monospace;
+}

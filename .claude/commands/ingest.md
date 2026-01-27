@@ -3,6 +3,18 @@
 Trigger a one-time fetch of IESO data for testing.
 
 ```bash
+
+# if cloned from the repo, run this to activate the virtual environment:
+# Create new venv
+python3 -m venv venv
+
+# Activate it
+source venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+#if not already in the producer directory, cd into it
 cd producer
 source venv/bin/activate
 

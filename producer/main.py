@@ -12,7 +12,7 @@ from datetime import datetime
 from config import settings
 from producers.kafka_producer import KafkaProducerClient
 from parsers.zonal_prices import fetch_zonal_prices
-from parsers.zonal_demand import fetch_zonal_demand
+from parsers.realtime_totals import fetch_realtime_totals
 from parsers.generator_output import fetch_generator_output
 from parsers.fuel_mix import fetch_fuel_mix
 from parsers.intertie_flow import fetch_intertie_flow
@@ -33,9 +33,9 @@ async def fetch_all_reports(producer: KafkaProducerClient) -> None:
     
     try:
         # Fetch 5-minute data in parallel
-        zonal_prices, zonal_demand, generator_output = await asyncio.gather(
+        zonal_prices, realtime_totals, generator_output = await asyncio.gather(
             fetch_zonal_prices(),
-            fetch_zonal_demand(),
+            fetch_realtime_totals(),
             fetch_generator_output(),
             return_exceptions=True
         )
@@ -47,11 +47,15 @@ async def fetch_all_reports(producer: KafkaProducerClient) -> None:
         else:
             logger.error(f"Failed to fetch zonal prices: {zonal_prices}")
             
-        if not isinstance(zonal_demand, Exception):
-            await producer.publish_batch("ieso.realtime.zonal-demand", zonal_demand)
-            logger.info(f"Published {len(zonal_demand)} zonal demand records")
+        if not isinstance(realtime_totals, Exception):
+            demand_records, supply_records = realtime_totals
+            await producer.publish_batch("ieso.realtime.zonal-demand", demand_records)
+            logger.info(f"Published {len(demand_records)} realtime demand records")
+            # Also publish realtime supply to fuel-mix topic
+            await producer.publish_batch("ieso.hourly.fuel-mix", supply_records)
+            logger.info(f"Published {len(supply_records)} realtime supply records")
         else:
-            logger.error(f"Failed to fetch zonal demand: {zonal_demand}")
+            logger.error(f"Failed to fetch realtime totals: {realtime_totals}")
             
         if not isinstance(generator_output, Exception):
             await producer.publish_batch("ieso.realtime.generator-output", generator_output)
