@@ -3,11 +3,17 @@ Ontario Grid Cockpit - IESO Data Producer
 
 Fetches data from IESO public reports and publishes to Kafka topics.
 Runs on a 5-minute schedule to match IESO data refresh rate.
+
+On startup, automatically backfills any missing data from IESO hourly archives.
+This handles gaps from laptop sleep, restarts, or other interruptions.
 """
 
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
+
+import httpx
+from lxml import etree
 
 from config import settings
 from producers.kafka_producer import KafkaProducerClient
@@ -23,6 +29,230 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+# IESO XML namespace for backfill parsing
+NS = {"ieso": "http://www.ieso.ca/schema"}
+
+
+async def fetch_price_archive(
+    client: httpx.AsyncClient,
+    date_compact: str,
+    hour: int
+) -> list[dict]:
+    """
+    Fetch and parse a single hourly RealtimeZonalEnergyPrices archive.
+
+    Args:
+        client: HTTP client
+        date_compact: Date in YYYYMMDD format
+        hour: Hour in IESO format (1-24)
+
+    Returns:
+        List of price records
+    """
+    records: list[dict] = []
+
+    filename = f"PUB_RealtimeZonalEnergyPrices_{date_compact}{hour:02d}.xml"
+    url = f"{settings.ieso_base_url}/RealtimeZonalEnergyPrices/{filename}"
+
+    try:
+        response = await client.get(url)
+        if response.status_code == 404:
+            return records
+        response.raise_for_status()
+
+        root = etree.fromstring(response.content)
+        doc_body = root.find(".//ieso:DocBody", NS)
+        if doc_body is None:
+            return records
+
+        date_str = doc_body.findtext("ieso:DELIVERYDATE", namespaces=NS)
+        hour_str = doc_body.findtext("ieso:DELIVERYHOUR", namespaces=NS)
+
+        if not date_str or not hour_str:
+            return records
+
+        base_date = datetime.strptime(date_str, "%Y-%m-%d")
+        hour_int = int(hour_str) - 1  # IESO uses 1-24
+
+        for zone in root.findall(".//ieso:TransactionZone", NS):
+            zone_name_el = zone.find("ieso:ZoneName", NS)
+            if zone_name_el is None or not zone_name_el.text:
+                continue
+
+            zone_name = zone_name_el.text.replace(":HUB", "")
+
+            for interval in zone.findall("ieso:IntervalPrice", NS):
+                interval_num = interval.findtext("ieso:Interval", namespaces=NS)
+                price = interval.findtext("ieso:ZonalPrice", namespaces=NS)
+                loss_price = interval.findtext("ieso:EnergyLossPrice", namespaces=NS)
+                cong_price = interval.findtext("ieso:EnergyCongPrice", namespaces=NS)
+
+                if not interval_num or not price:
+                    continue
+
+                try:
+                    minute = (int(interval_num) - 1) * 5
+                    timestamp = base_date.replace(hour=hour_int, minute=minute, second=0, microsecond=0)
+
+                    records.append({
+                        "timestamp": timestamp.isoformat(),
+                        "zone": zone_name,
+                        "price": float(price),
+                        "energy_loss_price": float(loss_price) if loss_price else 0.0,
+                        "congestion_price": float(cong_price) if cong_price else 0.0,
+                    })
+                except (ValueError, TypeError):
+                    pass
+
+    except Exception as e:
+        logger.debug(f"Could not fetch price archive for hour {hour}: {e}")
+
+    return records
+
+
+async def fetch_hourly_archive(
+    client: httpx.AsyncClient,
+    date_compact: str,
+    hour: int
+) -> tuple[list[dict], list[dict]]:
+    """
+    Fetch and parse a single hourly RealtimeTotals archive.
+
+    Args:
+        client: HTTP client
+        date_compact: Date in YYYYMMDD format
+        hour: Hour in IESO format (1-24)
+
+    Returns:
+        Tuple of (demand_records, supply_records)
+    """
+    demand_records: list[dict] = []
+    supply_records: list[dict] = []
+
+    filename = f"PUB_RealtimeTotals_{date_compact}{hour:02d}.xml"
+    url = f"{settings.ieso_base_url}/RealtimeTotals/{filename}"
+
+    try:
+        response = await client.get(url)
+        if response.status_code == 404:
+            return demand_records, supply_records
+        response.raise_for_status()
+
+        root = etree.fromstring(response.content)
+        doc_body = root.find(".//ieso:DocBody", NS)
+        if doc_body is None:
+            return demand_records, supply_records
+
+        date_str = doc_body.findtext("ieso:DeliveryDate", namespaces=NS)
+        hour_str = doc_body.findtext("ieso:DeliveryHour", namespaces=NS)
+
+        if not date_str or not hour_str:
+            return demand_records, supply_records
+
+        base_date = datetime.strptime(date_str, "%Y-%m-%d")
+        hour_int = int(hour_str) - 1  # IESO uses 1-24
+
+        for interval_energy in doc_body.findall(".//ieso:IntervalEnergy", NS):
+            interval_num = interval_energy.findtext("ieso:Interval", namespaces=NS)
+            if not interval_num:
+                continue
+
+            minute = (int(interval_num) - 1) * 5
+            timestamp = base_date.replace(hour=hour_int, minute=minute, second=0, microsecond=0)
+            ts_str = timestamp.isoformat()
+
+            for mq in interval_energy.findall("ieso:MQ", NS):
+                market_qty = mq.findtext("ieso:MarketQuantity", namespaces=NS)
+                energy_mw = mq.findtext("ieso:EnergyMW", namespaces=NS)
+
+                if not energy_mw:
+                    continue
+
+                try:
+                    mw_value = float(energy_mw)
+                except (ValueError, TypeError):
+                    continue
+
+                if market_qty == "ONTARIO DEMAND":
+                    demand_records.append({
+                        "timestamp": ts_str,
+                        "zone": "ONTARIO",
+                        "demand_mw": mw_value,
+                    })
+                elif market_qty == "Total Energy":
+                    supply_records.append({
+                        "timestamp": ts_str,
+                        "fuel_type": "REALTIME_TOTAL",
+                        "output_mw": mw_value,
+                    })
+
+    except Exception as e:
+        logger.debug(f"Could not fetch archive for hour {hour}: {e}")
+
+    return demand_records, supply_records
+
+
+async def backfill_on_startup(producer: KafkaProducerClient) -> None:
+    """
+    Backfill missing data from IESO hourly archives on startup.
+
+    Fetches all available hourly archives for today to fill any gaps
+    from when the producer wasn't running (e.g., laptop sleep).
+    Backfills demand, supply, AND prices.
+    """
+    logger.info("Checking for data gaps and backfilling if needed...")
+
+    # Get today's date in compact format
+    now = datetime.now()
+    today = now.strftime("%Y%m%d")
+    current_hour = now.hour + 1  # IESO uses 1-24, so add 1
+
+    all_demand: list[dict] = []
+    all_supply: list[dict] = []
+    all_prices: list[dict] = []
+
+    async with httpx.AsyncClient(timeout=30) as client:
+        # Fetch all available hours for today (1 to current hour)
+        # Run in parallel for speed
+        hours = list(range(1, min(current_hour + 1, 25)))
+
+        # Fetch demand/supply archives
+        demand_tasks = [fetch_hourly_archive(client, today, hour) for hour in hours]
+        demand_results = await asyncio.gather(*demand_tasks, return_exceptions=True)
+
+        for result in demand_results:
+            if isinstance(result, Exception):
+                continue
+            demand, supply = result
+            all_demand.extend(demand)
+            all_supply.extend(supply)
+
+        # Fetch price archives
+        price_tasks = [fetch_price_archive(client, today, hour) for hour in hours]
+        price_results = await asyncio.gather(*price_tasks, return_exceptions=True)
+
+        for result in price_results:
+            if isinstance(result, Exception):
+                continue
+            all_prices.extend(result)
+
+    if not all_demand and not all_supply and not all_prices:
+        logger.info("No backfill data available")
+        return
+
+    logger.info(f"Backfilling {len(all_demand)} demand, {len(all_supply)} supply, {len(all_prices)} price records...")
+
+    if all_demand:
+        await producer.publish_batch("ieso.realtime.zonal-demand", all_demand)
+
+    if all_supply:
+        await producer.publish_batch("ieso.hourly.fuel-mix", all_supply)
+
+    if all_prices:
+        await producer.publish_batch("ieso.realtime.zonal-prices", all_prices)
+
+    logger.info("Backfill complete!")
 
 
 async def fetch_all_reports(producer: KafkaProducerClient) -> None:
@@ -91,17 +321,25 @@ async def fetch_all_reports(producer: KafkaProducerClient) -> None:
 
 async def run_scheduler() -> None:
     """Run the producer on a schedule."""
-    
+
     producer = KafkaProducerClient(
         bootstrap_servers=settings.kafka_broker,
     )
-    
+
     logger.info(f"Starting producer with {settings.poll_interval}s interval")
     logger.info(f"Kafka broker: {settings.kafka_broker}")
-    
+
+    # Backfill any missing data from today's hourly archives
+    # This catches up on gaps from laptop sleep, restarts, etc.
+    try:
+        await backfill_on_startup(producer)
+    except Exception as e:
+        logger.warning(f"Backfill failed (continuing anyway): {e}")
+
+    # Main polling loop
     while True:
         await fetch_all_reports(producer)
-        
+
         # Wait for next interval
         logger.info(f"Sleeping for {settings.poll_interval}s...")
         await asyncio.sleep(settings.poll_interval)
