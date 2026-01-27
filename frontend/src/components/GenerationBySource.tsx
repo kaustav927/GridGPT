@@ -7,6 +7,8 @@ import styles from './GenerationBySource.module.css';
 interface FuelMixData {
   fuel_type: string;
   output_mw: number;
+  capacity_mw: number;
+  utilization: number;
 }
 
 interface ApiResponse {
@@ -44,16 +46,6 @@ export default function GenerationBySource() {
     return () => clearInterval(interval);
   }, []);
 
-  const renderCapacityBar = (percentage: number) => {
-    const bars = Math.round(percentage / 25);
-    return '█'.repeat(bars);
-  };
-
-  const renderStatusDots = (percentage: number) => {
-    const dots = Math.min(6, Math.round(percentage / 16.67));
-    return '●'.repeat(dots);
-  };
-
   return (
     <Card className={styles.card}>
       <h2 className={styles.header}>GENERATION BY SOURCE</h2>
@@ -66,42 +58,41 @@ export default function GenerationBySource() {
           <thead>
             <tr>
               <th>Fuel</th>
-              <th style={{ textAlign: 'right' }}>Output</th>
-              <th style={{ textAlign: 'center' }}>Status</th>
-              <th style={{ textAlign: 'right' }}>Capacity</th>
+              <th style={{ textAlign: 'right' }}>Output (MW)</th>
+              <th style={{ textAlign: 'right' }}>Capacity (MW)</th>
+              <th>Utilization</th>
             </tr>
           </thead>
           <tbody>
             {data.map((row) => {
-              const percentage = 100; // Simplified - would need actual capacity data
               const color = FUEL_COLORS[row.fuel_type] || '#8B949E';
+              const utilization = Math.min(row.utilization, 100);
               return (
                 <tr key={row.fuel_type}>
                   <td>
                     <span style={{ color }}>{row.fuel_type}</span>
                   </td>
                   <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
-                    {Math.round(row.output_mw).toLocaleString()} MW
+                    {Math.round(row.output_mw).toLocaleString()}
                   </td>
-                  <td
-                    style={{
-                      textAlign: 'center',
-                      color,
-                      fontSize: '8px',
-                      letterSpacing: '1px'
-                    }}
-                  >
-                    {renderStatusDots(percentage)}
+                  <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                    {Math.round(row.capacity_mw).toLocaleString()}
                   </td>
-                  <td
-                    style={{
-                      textAlign: 'right',
-                      color,
-                      fontSize: '11px',
-                      letterSpacing: '0'
-                    }}
-                  >
-                    {renderCapacityBar(percentage)}
+                  <td>
+                    <div className={styles.utilizationCell}>
+                      <div className={styles.utilizationBar}>
+                        <div
+                          className={styles.utilizationFill}
+                          style={{
+                            width: `${utilization}%`,
+                            backgroundColor: color,
+                          }}
+                        />
+                      </div>
+                      <span className={styles.utilizationText}>
+                        {Math.round(utilization)}%
+                      </span>
+                    </div>
                   </td>
                 </tr>
               );

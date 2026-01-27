@@ -11,12 +11,6 @@ interface ZonalPrice {
   timestamp?: string;
 }
 
-interface ZonalDemand {
-  zone: string;
-  demand_mw: number;
-  timestamp?: string;
-}
-
 interface Props {
   selectedZone?: string | null;
   onClearSelection?: () => void;
@@ -38,25 +32,16 @@ const ZONE_NAMES: Record<string, string> = {
 
 export default function ZoneDetail({ selectedZone, onClearSelection }: Props) {
   const [prices, setPrices] = useState<ZonalPrice[]>([]);
-  const [demands, setDemands] = useState<ZonalDemand[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [pricesRes, demandRes] = await Promise.all([
-          fetch('/api/prices'),
-          fetch('/api/demand'),
-        ]);
+        const pricesRes = await fetch('/api/prices');
 
         if (pricesRes.ok) {
           const pricesData = await pricesRes.json();
           setPrices(pricesData.data || []);
-        }
-
-        if (demandRes.ok) {
-          const demandData = await demandRes.json();
-          setDemands(demandData.data || []);
         }
       } catch (error) {
         console.error('Failed to fetch zone data:', error);
@@ -71,35 +56,27 @@ export default function ZoneDetail({ selectedZone, onClearSelection }: Props) {
   }, []);
 
   // Calculate displayed values based on selection
-  const { displayPrice, displayDemand, displayName, isAverage } = useMemo(() => {
+  const { displayPrice, displayName, isAverage } = useMemo(() => {
     if (selectedZone) {
-      // Show selected zone data
       const zonePrice = prices.find(p => p.zone === selectedZone);
-      const zoneDemand = demands.find(d => d.zone === selectedZone);
 
       return {
         displayPrice: zonePrice?.price ?? null,
-        displayDemand: zoneDemand?.demand_mw ?? null,
         displayName: ZONE_NAMES[selectedZone] || selectedZone,
         isAverage: false,
       };
     } else {
-      // Show averages
       const avgPrice = prices.length > 0
         ? prices.reduce((sum, p) => sum + p.price, 0) / prices.length
-        : null;
-      const totalDemand = demands.length > 0
-        ? demands.reduce((sum, d) => sum + d.demand_mw, 0)
         : null;
 
       return {
         displayPrice: avgPrice,
-        displayDemand: totalDemand,
         displayName: 'ONTARIO',
         isAverage: true,
       };
     }
-  }, [selectedZone, prices, demands]);
+  }, [selectedZone, prices]);
 
   // Generate sparkline data (simulated trend based on current price)
   const sparklineData = useMemo(() => {
@@ -182,24 +159,6 @@ export default function ZoneDetail({ selectedZone, onClearSelection }: Props) {
           </div>
 
           {/* Stats */}
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              marginBottom: '8px',
-              fontSize: '11px',
-            }}
-          >
-            <span style={{ color: '#8B949E' }}>
-              {isAverage ? 'Total Demand' : 'Demand'}
-            </span>
-            <span style={{ fontWeight: 600, color: '#39D5FF' }}>
-              {displayDemand !== null
-                ? `${Math.round(displayDemand).toLocaleString()} MW`
-                : 'N/A'}
-            </span>
-          </div>
-
           <div
             style={{
               display: 'flex',

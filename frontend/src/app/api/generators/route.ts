@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const fuelType = searchParams.get('fuel_type');
-  const limit = parseInt(searchParams.get('limit') || '50', 10);
+  const limit = parseInt(searchParams.get('limit') || '500', 10);
 
   try {
     const fuelFilter = fuelType ? `AND fuel_type = '${fuelType}'` : '';

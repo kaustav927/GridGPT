@@ -119,7 +119,6 @@ function MapContent({
             <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 8px; background: #161B22; border: 1px solid #30363D;">
               <div style="font-weight: 600; color: #E6EDF3; margin-bottom: 4px;">${feature.properties?.name || zone}</div>
               <div style="color: #D29922;">Price: $${zoneData?.price?.toFixed(2) || 'N/A'}/MWh</div>
-              <div style="color: #39D5FF;">Demand: ${zoneData?.demand_mw?.toLocaleString() || 'N/A'} MW</div>
             </div>
           `;
 
@@ -223,22 +222,17 @@ export default function OntarioMap({ onZoneSelect, selectedZone }: Props) {
   // Fetch zone prices
   const fetchZonePrices = useCallback(async () => {
     try {
-      const [pricesRes, demandRes] = await Promise.all([
-        fetch('/api/prices'),
-        fetch('/api/demand'),
-      ]);
+      const pricesRes = await fetch('/api/prices');
 
-      if (!pricesRes.ok || !demandRes.ok) {
+      if (!pricesRes.ok) {
         throw new Error('Failed to fetch zone data');
       }
 
       const pricesData = await pricesRes.json();
-      const demandData = await demandRes.json();
 
       // Create lookup map
       const priceMap: ZonePriceMap = {};
 
-      // Add prices
       pricesData.data.forEach((p: { zone: string; price: number; last_updated: string }) => {
         priceMap[p.zone] = {
           zone: p.zone,
@@ -246,20 +240,6 @@ export default function OntarioMap({ onZoneSelect, selectedZone }: Props) {
           demand_mw: 0,
           last_updated: p.last_updated,
         };
-      });
-
-      // Add demand
-      demandData.data.forEach((d: { zone: string; demand_mw: number; last_updated: string }) => {
-        if (priceMap[d.zone]) {
-          priceMap[d.zone].demand_mw = d.demand_mw;
-        } else {
-          priceMap[d.zone] = {
-            zone: d.zone,
-            price: 0,
-            demand_mw: d.demand_mw,
-            last_updated: d.last_updated,
-          };
-        }
       });
 
       setZonePrices(priceMap);

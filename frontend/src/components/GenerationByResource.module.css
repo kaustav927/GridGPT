@@ -2,11 +2,11 @@
   background: var(--bg-surface) !important;
   border: 1px solid var(--border-color) !important;
   border-radius: 0 !important;
-  padding: 20px !important;
+  padding: 12px !important;
 }
 
 .header {
-  margin: 0 0 16px 0;
+  margin: 0 0 8px 0;
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.05em;
@@ -23,50 +23,80 @@
 .content {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 2px;
+}
+
+/* --- Fuel type section --- */
+.fuelSection {
+  margin-bottom: 2px;
 }
 
 .sectionHeader {
   display: flex;
   justify-content: space-between;
-  padding: 8px 0;
-  font-size: 11px;
-  font-weight: 600;
+  align-items: center;
+  padding: 4px 8px;
+  font-size: 13px;
+  font-weight: 700;
 }
 
-.generatorRow {
-  display: flex;
-  gap: 12px;
-  padding: 12px;
-  background: var(--bg-primary);
-  border-radius: 0;
-  height: 70px;
+.fuelLabel {
+  letter-spacing: 0.02em;
 }
 
-.generatorInfo {
+.fuelTotal {
+  font-variant-numeric: tabular-nums;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+/* --- 3-column plant grid --- */
+.plantGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: #21262D;
+}
+
+/* --- Individual plant chart card --- */
+.plantCard {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  justify-content: center;
-  width: 130px;
+  background: #0D1117;
+  min-width: 0;
+}
+
+.plantHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 3px 6px;
+  gap: 4px;
+  min-height: 20px;
+}
+
+.plantName {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.plantMw {
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  font-family: 'JetBrains Mono', monospace;
   flex-shrink: 0;
 }
 
-.generatorName {
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--text-primary);
-}
-
-.generatorOutput {
-  font-size: 10px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-
-.sparkline {
-  flex: 1;
-  background: var(--bg-surface);
-  border-radius: 0;
+.chartArea {
   min-width: 0;
+  height: 90px;
 }
