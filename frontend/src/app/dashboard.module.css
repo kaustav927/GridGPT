@@ -35,24 +35,6 @@
   gap: 16px;
 }
 
-.weatherBtn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-color);
-  color: var(--text-primary);
-  font-size: 11px;
-  cursor: pointer;
-  border-radius: 0;
-  font-family: 'JetBrains Mono', monospace;
-}
-
-.weatherBtn:hover {
-  background: var(--bg-elevated);
-}
-
 .liveStatus {
   display: flex;
   align-items: center;
@@ -89,7 +71,7 @@
 
 .mainContent {
   display: grid;
-  grid-template-columns: 420px 1fr 380px;
+  grid-template-columns: 480px 1fr 420px;
   gap: 16px;
   padding: 16px;
   max-width: 1920px;

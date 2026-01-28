@@ -53,18 +53,6 @@ export default function Dashboard() {
           <h1 className={styles.title}>ONTARIO GRID COCKPIT</h1>
         </div>
         <div className={styles.statusSection}>
-          <button className={styles.weatherBtn}>
-            <Icon icon="temperature" size={14} />
-            <span>Temperature</span>
-          </button>
-          <button className={styles.weatherBtn}>
-            <Icon icon="wind" size={14} />
-            <span>Wind</span>
-          </button>
-          <button className={styles.weatherBtn}>
-            <Icon icon="cloud" size={14} />
-            <span>Precipitation</span>
-          </button>
           <div className={styles.liveStatus}>
             <div className={styles.liveDot} />
             <span>LIVE</span>

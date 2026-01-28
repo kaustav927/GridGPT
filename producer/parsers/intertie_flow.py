@@ -3,12 +3,13 @@ Parser for IESO Intertie Schedule and Flow XML report.
 URL: https://reports-public.ieso.ca/public/IntertieScheduleFlow/PUB_IntertieScheduleFlow.xml
 
 Note: Uses theIMO.com namespace. Has hourly schedules (Import/Export) and 5-min actuals (Flow).
-Positive flow = import into Ontario, Negative = export from Ontario.
+Positive flow = export from Ontario, Negative = import into Ontario.
 """
 
 import logging
 from datetime import datetime
 from typing import TypedDict
+from zoneinfo import ZoneInfo
 
 import httpx
 from lxml import etree
@@ -103,13 +104,16 @@ async def fetch_intertie_flow() -> list[IntertieFlowRecord]:
             # Create records - one per 5-min interval with actual data
             for (hour, interval), actual_flow in sorted(actuals.items()):
                 try:
-                    # IESO uses 1-24 hours, convert to 0-23
+                    # IESO uses 1-24 hours (Hour Ending), convert to 0-23
                     # Interval 1 = :00, Interval 2 = :05, etc.
                     minute = (interval - 1) * 5
-                    timestamp = base_date.replace(hour=hour - 1, minute=minute, second=0, microsecond=0)
-                    
+                    # IESO times are Eastern Prevailing Time (EPT) — convert to UTC for storage
+                    ept = ZoneInfo("America/Toronto")
+                    naive_ts = base_date.replace(hour=hour - 1, minute=minute, second=0, microsecond=0)
+                    timestamp = naive_ts.replace(tzinfo=ept).astimezone(ZoneInfo("UTC"))
+
                     record: IntertieFlowRecord = {
-                        "timestamp": timestamp.isoformat(),
+                        "timestamp": timestamp.strftime("%Y-%m-%dT%H:%M:%S"),
                         "intertie": zone_name,
                         "scheduled_mw": schedules_by_hour.get(hour, 0.0),
                         "actual_mw": actual_flow,

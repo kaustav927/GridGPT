@@ -28,3 +28,34 @@
   color: var(--text-secondary);
   font-size: 14px;
 }
+
+.weatherBar {
+  display: flex;
+  gap: 8px;
+  padding-top: 8px;
+}
+
+.weatherBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  font-size: 11px;
+  cursor: pointer;
+  border-radius: 0;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.weatherBtn:hover {
+  background: var(--bg-elevated);
+}
+
+.weatherBtnActive {
+  composes: weatherBtn;
+  background: rgba(88, 166, 255, 0.15);
+  border-color: #58A6FF;
+  color: #58A6FF;
+}

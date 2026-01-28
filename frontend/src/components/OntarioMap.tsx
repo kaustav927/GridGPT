@@ -1,10 +1,13 @@
 'use client';
 
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
-import { Card } from '@blueprintjs/core';
+import { Card, Icon } from '@blueprintjs/core';
 import styles from './Card.module.css';
 import ontarioZones from '@/data/ontario-zones.geojson';
+import { GENERATION_SITES, FUEL_COLORS } from '@/data/generation-sites';
+import { TRANSMISSION_IMAGE_URL, TRANSMISSION_BOUNDS, INTERTIES } from '@/data/transmission-lines';
 import type { ZoneData } from '@/lib/types';
+import Tooltip from './Tooltip';
 
 // Price-to-color mapping for zone coloring
 const priceToColor = (price: number): string => {
@@ -19,8 +22,8 @@ const priceToColor = (price: number): string => {
 };
 
 const priceToOpacity = (price: number): number => {
-  const baseOpacity = 0.4;
-  const maxOpacity = 0.8;
+  const baseOpacity = 0.12;
+  const maxOpacity = 0.3;
   const normalizedPrice = Math.min(Math.abs(price) / 200, 1);
   return baseOpacity + normalizedPrice * (maxOpacity - baseOpacity);
 };
@@ -38,14 +41,24 @@ interface Props {
 function MapContent({
   zonePrices,
   selectedZone,
-  onZoneSelect
+  onZoneSelect,
+  showGeneration,
+  showTransmission,
+  showPricing,
 }: {
   zonePrices: ZonePriceMap;
   selectedZone?: string | null;
   onZoneSelect?: (zone: string | null) => void;
+  showGeneration: boolean;
+  showTransmission: boolean;
+  showPricing: boolean;
 }) {
   const mapRef = useRef<L.Map | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const pricingLayerRef = useRef<L.GeoJSON | null>(null);
+  const generationLayerRef = useRef<L.LayerGroup | null>(null);
+  const transmissionLayerRef = useRef<L.LayerGroup | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (typeof window === 'undefined' || !containerRef.current) return;
@@ -70,8 +83,8 @@ function MapContent({
 
       // Create map
       const map = L.map(containerRef.current, {
-        center: [50.0, -85.0],
-        zoom: 5,
+        center: [49.5, -84.5],
+        zoom: 6,
         scrollWheelZoom: true,
         zoomControl: true,
       });
@@ -83,82 +96,9 @@ function MapContent({
         attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
       }).addTo(map);
 
-      // Add GeoJSON layer
-      const geojsonLayer = L.geoJSON(ontarioZones as GeoJSON.FeatureCollection, {
-        style: (feature: GeoJSON.Feature | undefined) => {
-          if (!feature?.properties?.zone) {
-            return {
-              fillColor: '#30363D',
-              fillOpacity: 0.3,
-              color: '#30363D',
-              weight: 1,
-            };
-          }
-
-          const zone = feature.properties.zone;
-          const zoneData = zonePrices[zone];
-          const price = zoneData?.price || 0;
-          const isSelected = zone === selectedZone;
-
-          return {
-            fillColor: priceToColor(price),
-            fillOpacity: isSelected ? 0.9 : priceToOpacity(price),
-            color: isSelected ? '#58A6FF' : '#30363D',
-            weight: isSelected ? 3 : 1,
-            className: isSelected ? 'zone-selected' : '',
-          };
-        },
-        onEachFeature: (feature: GeoJSON.Feature, layer: L.Layer) => {
-          const zone = feature.properties?.zone;
-          if (!zone) return;
-
-          const zoneData = zonePrices[zone];
-
-          // Tooltip content
-          const tooltipContent = `
-            <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 8px; background: #161B22; border: 1px solid #30363D;">
-              <div style="font-weight: 600; color: #E6EDF3; margin-bottom: 4px;">${feature.properties?.name || zone}</div>
-              <div style="color: #D29922;">Price: $${zoneData?.price?.toFixed(2) || 'N/A'}/MWh</div>
-            </div>
-          `;
-
-          layer.bindTooltip(tooltipContent, {
-            permanent: false,
-            direction: 'auto',
-            className: 'zone-tooltip',
-          });
-
-          // Click handler - toggle selection
-          layer.on('click', () => {
-            if (onZoneSelect) {
-              // Toggle: if same zone clicked, deselect; otherwise select new zone
-              onZoneSelect(zone === selectedZone ? null : zone);
-            }
-          });
-
-          // Hover effects
-          layer.on('mouseover', () => {
-            (layer as L.Path).setStyle({
-              fillOpacity: 0.9,
-              weight: 2,
-            });
-          });
-
-          layer.on('mouseout', () => {
-            const price = zonePrices[zone]?.price || 0;
-            const isSelected = zone === selectedZone;
-            (layer as L.Path).setStyle({
-              fillColor: priceToColor(price),
-              fillOpacity: isSelected ? 0.9 : priceToOpacity(price),
-              color: isSelected ? '#58A6FF' : '#30363D',
-              weight: isSelected ? 3 : 1,
-            });
-          });
-        },
-      }).addTo(map);
-
-      // Fit bounds to Ontario
-      map.fitBounds(geojsonLayer.getBounds(), { padding: [20, 20] });
+      // Compute Ontario bounds from GeoJSON for initial view (without adding the layer)
+      const boundsLayer = L.geoJSON(ontarioZones as GeoJSON.FeatureCollection);
+      map.fitBounds(boundsLayer.getBounds(), { padding: [10, 10] });
     };
 
     initMap();
@@ -173,18 +113,29 @@ function MapContent({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Update styles when prices change
+  // Manage pricing zones layer
   useEffect(() => {
     if (!mapRef.current) return;
+    const map = mapRef.current;
 
-    mapRef.current.eachLayer((layer) => {
-      if ((layer as L.GeoJSON).feature) {
-        const geoLayer = layer as L.GeoJSON;
-        geoLayer.setStyle((feature) => {
+    // Remove existing layer
+    if (pricingLayerRef.current) {
+      map.removeLayer(pricingLayerRef.current);
+      pricingLayerRef.current = null;
+    }
+
+    if (!showPricing) return;
+
+    const loadLayer = async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const L = (await import('leaflet')) as any;
+
+      const geojsonLayer = L.geoJSON(ontarioZones as GeoJSON.FeatureCollection, {
+        style: (feature: GeoJSON.Feature | undefined) => {
           if (!feature?.properties?.zone) {
             return {
               fillColor: '#30363D',
-              fillOpacity: 0.3,
+              fillOpacity: 0.1,
               color: '#30363D',
               weight: 1,
             };
@@ -197,14 +148,289 @@ function MapContent({
 
           return {
             fillColor: priceToColor(price),
-            fillOpacity: isSelected ? 0.9 : priceToOpacity(price),
+            fillOpacity: isSelected ? 0.5 : priceToOpacity(price),
             color: isSelected ? '#58A6FF' : '#30363D',
-            weight: isSelected ? 3 : 1,
+            weight: isSelected ? 2 : 1,
+            className: isSelected ? 'zone-selected' : '',
           };
-        });
+        },
+        onEachFeature: (feature: GeoJSON.Feature, layer: L.Layer) => {
+          const zone = feature.properties?.zone;
+          if (!zone) return;
+
+          const zoneData = zonePrices[zone];
+
+          const tooltipContent = `
+            <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 8px; background: #161B22; border: 1px solid #30363D;">
+              <div style="font-weight: 600; color: #E6EDF3; margin-bottom: 4px;">${feature.properties?.name || zone}</div>
+              <div style="color: #D29922;">Price: $${zoneData?.price?.toFixed(2) || 'N/A'}/MWh</div>
+            </div>
+          `;
+
+          layer.bindTooltip(tooltipContent, {
+            permanent: false,
+            direction: 'auto',
+            className: 'zone-tooltip',
+          });
+
+          layer.on('click', () => {
+            if (onZoneSelect) {
+              onZoneSelect(zone === selectedZone ? null : zone);
+            }
+          });
+
+          layer.on('mouseover', () => {
+            const el = (layer as L.Path).getElement?.();
+            if (el) el.classList.add('zone-hover');
+          });
+
+          layer.on('mouseout', () => {
+            const el = (layer as L.Path).getElement?.();
+            if (el) el.classList.remove('zone-hover');
+          });
+        },
+      });
+
+      geojsonLayer.addTo(map);
+      geojsonLayer.bringToBack();
+      pricingLayerRef.current = geojsonLayer;
+    };
+
+    loadLayer();
+  }, [showPricing, zonePrices, selectedZone, onZoneSelect]);
+
+  // Manage generation site markers layer
+  useEffect(() => {
+    if (!mapRef.current) return;
+    const map = mapRef.current;
+
+    // Remove existing layer
+    if (generationLayerRef.current) {
+      map.removeLayer(generationLayerRef.current);
+      generationLayerRef.current = null;
+    }
+
+    if (!showGeneration) return;
+
+    const loadLayer = async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const L = (await import('leaflet')) as any;
+
+      const markers = GENERATION_SITES.map((site) =>
+        L.circleMarker([site.lat, site.lng], {
+          radius: 5,
+          fillColor: FUEL_COLORS[site.fuelType],
+          fillOpacity: 0.85,
+          color: '#0D1117',
+          weight: 1,
+        }).bindTooltip(
+          `<div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 8px; background: #161B22; border: 1px solid #30363D;">
+            <div style="font-weight: 600; color: #E6EDF3; margin-bottom: 4px;">${site.name}</div>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span style="display: inline-block; width: 8px; height: 8px; background: ${FUEL_COLORS[site.fuelType]};"></span>
+              <span style="color: ${FUEL_COLORS[site.fuelType]}; text-transform: capitalize;">${site.fuelType}</span>
+            </div>
+          </div>`,
+          { direction: 'auto', className: 'zone-tooltip' }
+        )
+      );
+
+      const layerGroup = L.layerGroup(markers);
+      layerGroup.addTo(map);
+      generationLayerRef.current = layerGroup;
+    };
+
+    loadLayer();
+  }, [showGeneration]);
+
+  // Manage transmission overlay layer with animated intertie flow arrows
+  useEffect(() => {
+    if (!mapRef.current) return;
+    const map = mapRef.current;
+
+    // Cancel any running animation
+    if (animationFrameRef.current !== null) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+
+    // Remove existing layer
+    if (transmissionLayerRef.current) {
+      map.removeLayer(transmissionLayerRef.current);
+      transmissionLayerRef.current = null;
+    }
+
+    if (!showTransmission) return;
+
+    const loadLayer = async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const L = (await import('leaflet')) as any;
+
+      const layers: L.Layer[] = [];
+
+      // Add IESO transmission image overlay
+      const imageOverlay = L.imageOverlay(TRANSMISSION_IMAGE_URL, TRANSMISSION_BOUNDS, {
+        opacity: 0.85,
+        interactive: false,
+      });
+      layers.push(imageOverlay);
+
+      // Fetch grouped intertie flow data from API
+      // API convention: positive = export from Ontario, negative = import to Ontario
+      const flowByGroup: Record<string, { mw: number; lastUpdated: string }> = {};
+      try {
+        const res = await fetch('/api/interties');
+        if (res.ok) {
+          const json = await res.json();
+          for (const row of json.data) {
+            flowByGroup[row.flow_group] = { mw: row.actual_mw, lastUpdated: row.last_updated };
+          }
+        }
+      } catch {
+        // Fallback: no flow data, static lines only
       }
-    });
-  }, [zonePrices, selectedZone]);
+
+      // Helper: compute bearing between two points
+      const getBearing = (lat0: number, lng0: number, lat1: number, lng1: number): number => {
+        const dLng = lng1 - lng0;
+        const dLat = lat1 - lat0;
+        return Math.atan2(dLng, dLat) * (180 / Math.PI);
+      };
+
+      // Chevron markers for animation
+      const chevronMarkers: { marker: L.Marker; from: [number, number]; to: [number, number]; offset: number }[] = [];
+
+      // Add intertie polylines with flow-aware styling
+      // API convention: positive = export from Ontario, negative = import to Ontario
+      INTERTIES.forEach((intertie) => {
+        const entry = flowByGroup[intertie.flowKey];
+        const mw = entry?.mw ?? 0;
+        const isExport = mw > 0;
+        const hasFlow = Math.abs(mw) > 1;
+
+        const lineColor = hasFlow
+          ? (isExport ? '#3FB950' : '#F85149')
+          : '#F0883E';
+
+        const dirLabel = hasFlow
+          ? (isExport ? 'EXPORT' : 'IMPORT')
+          : 'NO FLOW';
+        const dirColor = hasFlow
+          ? (isExport ? '#3FB950' : '#F85149')
+          : '#8B949E';
+
+        const asOf = entry?.lastUpdated
+          ? new Date(entry.lastUpdated.replace(' ', 'T') + 'Z')
+              .toLocaleString(undefined, { timeZone: 'America/Toronto', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+          : '';
+
+        const polyline = L.polyline(intertie.path, {
+          color: lineColor,
+          weight: 3,
+          opacity: hasFlow ? 0.9 : 0.5,
+          dashArray: hasFlow ? undefined : '8, 6',
+        }).bindTooltip(
+          `<div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 8px; background: #161B22; border: 1px solid #30363D;">
+            <div style="font-weight: 600; color: #E6EDF3; margin-bottom: 4px;">${intertie.name}</div>
+            <div style="color: ${dirColor}; font-weight: 600;">${dirLabel} ${hasFlow ? Math.abs(mw).toFixed(0) + ' MW' : ''}</div>
+            ${asOf ? `<div style="color: #8B949E; font-size: 10px; margin-top: 4px;">as of ${asOf}</div>` : ''}
+          </div>`,
+          { direction: 'auto', className: 'zone-tooltip', sticky: true }
+        );
+        layers.push(polyline);
+
+        // Create animated chevron markers for lines with flow
+        if (hasFlow) {
+          // path[0] = Ontario side, path[1] = external side
+          // Export (positive MW) = arrows from Ontario → external (path[0] → path[1])
+          // Import (negative MW) = arrows from external → Ontario (path[1] → path[0])
+          const from: [number, number] = isExport ? intertie.path[0] : intertie.path[1];
+          const to: [number, number] = isExport ? intertie.path[1] : intertie.path[0];
+
+          const bearing = getBearing(from[0], from[1], to[0], to[1]);
+          const chevronColor = isExport ? '#3FB950' : '#F85149';
+
+          // Create 3 staggered chevrons per line
+          for (let i = 0; i < 3; i++) {
+            const icon = L.divIcon({
+              html: `<span style="
+                font-size: 16px;
+                font-weight: bold;
+                color: ${chevronColor};
+                text-shadow: 0 0 4px ${chevronColor};
+                transform: rotate(${bearing - 90}deg);
+                display: inline-block;
+                pointer-events: none;
+                line-height: 1;
+              ">&rsaquo;&rsaquo;&rsaquo;</span>`,
+              className: '',
+              iconSize: [20, 20],
+              iconAnchor: [10, 10],
+            });
+
+            const marker = L.marker(from, {
+              icon,
+              interactive: false,
+              keyboard: false,
+            });
+            layers.push(marker);
+
+            chevronMarkers.push({
+              marker,
+              from,
+              to,
+              offset: i / 3, // stagger: 0, 0.33, 0.66
+            });
+          }
+        }
+      });
+
+      const layerGroup = L.layerGroup(layers);
+      layerGroup.addTo(map);
+      transmissionLayerRef.current = layerGroup;
+
+      // Animation loop
+      if (chevronMarkers.length > 0) {
+        const cycleDuration = 2000; // ms per full cycle
+        const startTime = performance.now();
+
+        const animate = (now: number) => {
+          const elapsed = now - startTime;
+
+          for (const chev of chevronMarkers) {
+            // Progress 0→1 over cycleDuration, offset by stagger
+            const rawT = ((elapsed / cycleDuration) + chev.offset) % 1;
+            const t = rawT;
+
+            // Interpolate position
+            const lat = chev.from[0] + t * (chev.to[0] - chev.from[0]);
+            const lng = chev.from[1] + t * (chev.to[1] - chev.from[1]);
+            chev.marker.setLatLng([lat, lng]);
+
+            // Fade: sin curve peaks at 0.5 progress
+            const opacity = Math.sin(t * Math.PI);
+            const el = chev.marker.getElement();
+            if (el) {
+              el.style.opacity = String(opacity);
+            }
+          }
+
+          animationFrameRef.current = requestAnimationFrame(animate);
+        };
+
+        animationFrameRef.current = requestAnimationFrame(animate);
+      }
+    };
+
+    loadLayer();
+
+    return () => {
+      if (animationFrameRef.current !== null) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+    };
+  }, [showTransmission]);
 
   return (
     <div
@@ -218,6 +444,9 @@ export default function OntarioMap({ onZoneSelect, selectedZone }: Props) {
   const [zonePrices, setZonePrices] = useState<ZonePriceMap>({});
   const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
+  const [showGeneration, setShowGeneration] = useState(false);
+  const [showTransmission, setShowTransmission] = useState(false);
+  const [showPricing, setShowPricing] = useState(false);
 
   // Fetch zone prices
   const fetchZonePrices = useCallback(async () => {
@@ -265,7 +494,7 @@ export default function OntarioMap({ onZoneSelect, selectedZone }: Props) {
   }, [zonePrices]);
 
   return (
-    <Card className={styles.card} style={{ height: 500, position: 'relative' }}>
+    <Card className={styles.card} style={{ aspectRatio: '1 / 0.85', position: 'relative', display: 'flex', flexDirection: 'column' }}>
       <div className={styles.headerRow}>
         <h2 className={styles.header}>ONTARIO ZONE MAP</h2>
         <div style={{ display: 'flex', gap: '16px', fontSize: '10px', alignItems: 'center' }}>
@@ -274,29 +503,105 @@ export default function OntarioMap({ onZoneSelect, selectedZone }: Props) {
               Avg Price: <span style={{ color: priceToColor(avgPrice), fontWeight: 600 }}>${avgPrice.toFixed(2)}/MWh</span>
             </div>
           )}
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            <span style={{ color: '#8B949E' }}>Price:</span>
-            <div style={{ display: 'flex', gap: '2px' }}>
-              <div style={{ width: 12, height: 12, background: '#3FB950' }} title="< $30" />
-              <div style={{ width: 12, height: 12, background: '#58A6FF' }} title="$30-50" />
-              <div style={{ width: 12, height: 12, background: '#D29922' }} title="$100-150" />
-              <div style={{ width: 12, height: 12, background: '#F85149' }} title="> $200" />
+          {showPricing && (
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <span style={{ color: '#8B949E' }}>Price:</span>
+              <div style={{ display: 'flex', gap: '2px' }}>
+                {([
+                  { color: '#3FB950', label: '< $0', desc: 'Surplus' },
+                  { color: '#238636', label: '$0–30', desc: 'Low' },
+                  { color: '#58A6FF', label: '$30–50', desc: 'Normal' },
+                  { color: '#1F6FEB', label: '$50–100', desc: 'Moderate' },
+                  { color: '#D29922', label: '$100–150', desc: 'Elevated' },
+                  { color: '#DB6D28', label: '$150–200', desc: 'High' },
+                  { color: '#F85149', label: '$200–300', desc: 'Very High' },
+                  { color: '#DA3633', label: '> $300', desc: 'Critical' },
+                ] as const).map((tier) => (
+                  <Tooltip
+                    key={tier.color}
+                    content={
+                      <div>
+                        <div style={{ fontWeight: 600, marginBottom: 2 }}>{tier.desc}</div>
+                        <div style={{ color: tier.color }}>{tier.label}/MWh</div>
+                      </div>
+                    }
+                  >
+                    <div style={{ width: 12, height: 12, background: tier.color, cursor: 'default' }} />
+                  </Tooltip>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
+          {showGeneration && (
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <span style={{ color: '#8B949E' }}>Fuel:</span>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                {Object.entries(FUEL_COLORS).map(([fuel, color]) => (
+                  <div key={fuel} style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: color }} />
+                    <span style={{ color: '#8B949E', textTransform: 'capitalize', fontSize: '9px' }}>{fuel}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
       {!mounted || loading ? (
         <div className={styles.placeholder}>Loading map...</div>
       ) : (
-        <div style={{ height: 'calc(100% - 40px)', width: '100%' }}>
+        <div style={{ flex: 1, minHeight: 0, width: '100%' }}>
           <MapContent
             zonePrices={zonePrices}
             selectedZone={selectedZone}
             onZoneSelect={onZoneSelect}
+            showGeneration={showGeneration}
+            showTransmission={showTransmission}
+            showPricing={showPricing}
           />
         </div>
       )}
+
+      <div className={styles.weatherBar}>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            className={showPricing ? styles.weatherBtnActive : styles.weatherBtn}
+            onClick={() => setShowPricing((v) => !v)}
+          >
+            <Icon icon="dollar" size={14} />
+            <span>Pricing</span>
+          </button>
+          <button
+            className={showGeneration ? styles.weatherBtnActive : styles.weatherBtn}
+            onClick={() => setShowGeneration((v) => !v)}
+          >
+            <Icon icon="flash" size={14} />
+            <span>Generation</span>
+          </button>
+          <button
+            className={showTransmission ? styles.weatherBtnActive : styles.weatherBtn}
+            onClick={() => setShowTransmission((v) => !v)}
+          >
+            <Icon icon="route" size={14} />
+            <span>Transmission</span>
+          </button>
+        </div>
+        <div style={{ display: 'flex', gap: '8px', marginLeft: 'auto' }}>
+          <button className={styles.weatherBtn}>
+            <Icon icon="temperature" size={14} />
+            <span>Temperature</span>
+          </button>
+          <button className={styles.weatherBtn}>
+            <Icon icon="wind" size={14} />
+            <span>Wind</span>
+          </button>
+          <button className={styles.weatherBtn}>
+            <Icon icon="cloud" size={14} />
+            <span>Precipitation</span>
+          </button>
+        </div>
+      </div>
 
       <style jsx global>{`
         .zone-tooltip {
@@ -335,6 +640,12 @@ export default function OntarioMap({ onZoneSelect, selectedZone }: Props) {
         /* Glow effect for selected zone */
         .zone-selected {
           filter: drop-shadow(0 0 8px rgba(88, 166, 255, 0.6)) drop-shadow(0 0 16px rgba(88, 166, 255, 0.4));
+        }
+        /* Inner glow border on hover */
+        .zone-hover {
+          stroke: #58A6FF !important;
+          stroke-width: 2.5 !important;
+          filter: drop-shadow(0 0 6px rgba(88, 166, 255, 0.6)) drop-shadow(0 0 12px rgba(88, 166, 255, 0.3));
         }
         .leaflet-interactive {
           cursor: pointer;
