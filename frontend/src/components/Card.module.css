@@ -2,7 +2,7 @@
   background: var(--bg-surface) !important;
   border: 1px solid var(--border-color) !important;
   border-radius: 0 !important;
-  padding: 20px !important;
+  padding: 16px !important;
 }
 
 .headerRow {
@@ -10,6 +10,8 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 16px;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .header {
@@ -18,6 +20,7 @@
   font-weight: 600;
   letter-spacing: 0.05em;
   color: var(--text-primary);
+  white-space: nowrap;
 }
 
 .placeholder {
@@ -31,22 +34,24 @@
 
 .weatherBar {
   display: flex;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 6px;
   padding-top: 8px;
 }
 
 .weatherBtn {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 14px;
+  gap: 6px;
+  padding: 5px 10px;
   background: var(--bg-primary);
   border: 1px solid var(--border-color);
   color: var(--text-primary);
-  font-size: 11px;
+  font-size: 10px;
   cursor: pointer;
   border-radius: 0;
   font-family: 'JetBrains Mono', monospace;
+  white-space: nowrap;
 }
 
 .weatherBtn:hover {
@@ -58,4 +63,104 @@
   background: rgba(88, 166, 255, 0.15);
   border-color: #58A6FF;
   color: #58A6FF;
+}
+
+/* Large laptop breakpoint */
+@media (max-width: 1400px) {
+  .card {
+    padding: 14px !important;
+  }
+
+  .headerRow {
+    margin-bottom: 12px;
+    gap: 10px;
+  }
+
+  .weatherBtn {
+    padding: 4px 8px;
+    gap: 5px;
+    font-size: 9px;
+  }
+
+  .weatherBar {
+    gap: 5px;
+  }
+}
+
+/* Medium laptop breakpoint */
+@media (max-width: 1200px) {
+  .card {
+    padding: 12px !important;
+  }
+
+  .headerRow {
+    margin-bottom: 10px;
+    gap: 8px;
+  }
+
+  .header {
+    font-size: 11px;
+  }
+
+  .weatherBtn {
+    padding: 3px 6px;
+    gap: 4px;
+    font-size: 9px;
+  }
+
+  .weatherBar {
+    gap: 4px;
+  }
+}
+
+/* Small laptop breakpoint */
+@media (max-width: 1024px) {
+  .card {
+    padding: 10px !important;
+  }
+
+  .headerRow {
+    margin-bottom: 8px;
+    gap: 6px;
+  }
+
+  .header {
+    font-size: 10px;
+  }
+
+  .weatherBtn {
+    padding: 3px 5px;
+    gap: 3px;
+    font-size: 8px;
+  }
+
+  .weatherBar {
+    gap: 3px;
+  }
+}
+
+/* Mobile - restore comfortable sizing */
+@media (max-width: 900px) {
+  .card {
+    padding: 16px !important;
+  }
+
+  .headerRow {
+    margin-bottom: 16px;
+    gap: 12px;
+  }
+
+  .header {
+    font-size: 12px;
+  }
+
+  .weatherBtn {
+    padding: 5px 10px;
+    gap: 6px;
+    font-size: 10px;
+  }
+
+  .weatherBar {
+    gap: 6px;
+  }
 }

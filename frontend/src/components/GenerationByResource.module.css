@@ -100,3 +100,41 @@
   min-width: 0;
   height: 90px;
 }
+
+/* Responsive breakpoints */
+@media (max-width: 1400px) {
+  .sectionHeader { padding: 3px 6px; font-size: 12px; }
+  .fuelTotal { font-size: 13px; }
+  .plantName { font-size: 9px; }
+  .plantMw { font-size: 10px; }
+  .chartArea { height: 80px; }
+}
+
+@media (max-width: 1200px) {
+  .plantGrid { grid-template-columns: repeat(2, 1fr); }
+  .sectionHeader { font-size: 11px; }
+  .fuelTotal { font-size: 12px; }
+  .plantName { font-size: 9px; }
+  .plantMw { font-size: 9px; }
+  .chartArea { height: 75px; }
+}
+
+@media (max-width: 1024px) {
+  .plantGrid { grid-template-columns: repeat(2, 1fr); }
+  .sectionHeader { padding: 2px 4px; font-size: 10px; }
+  .fuelLabel { font-size: 10px; }
+  .fuelTotal { font-size: 11px; }
+  .plantHeader { padding: 2px 3px; min-height: 14px; gap: 2px; }
+  .plantName { font-size: 8px; }
+  .plantMw { font-size: 8px; }
+  .chartArea { height: 65px; }
+}
+
+@media (max-width: 900px) {
+  .plantGrid { grid-template-columns: repeat(2, 1fr); }
+  .sectionHeader { padding: 4px 8px; font-size: 13px; }
+  .fuelTotal { font-size: 14px; }
+  .plantName { font-size: 10px; }
+  .plantMw { font-size: 11px; }
+  .chartArea { height: 80px; }
+}

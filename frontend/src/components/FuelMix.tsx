@@ -67,7 +67,7 @@ export default function FuelMix() {
       ) : (
         <>
           <div className={styles.chartContainer}>
-            <ResponsiveContainer width="100%" height={200}>
+            <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
                   data={data}
@@ -75,8 +75,8 @@ export default function FuelMix() {
                   nameKey="fuel_type"
                   cx="50%"
                   cy="50%"
-                  innerRadius={60}
-                  outerRadius={90}
+                  innerRadius="45%"
+                  outerRadius="70%"
                   onClick={(entry) => setSelectedFuel(
                     selectedFuel === entry.fuel_type ? null : entry.fuel_type
                   )}

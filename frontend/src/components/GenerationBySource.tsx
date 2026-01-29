@@ -59,7 +59,7 @@ export default function GenerationBySource() {
             <tr>
               <th>Fuel</th>
               <th style={{ textAlign: 'right' }}>Output (MW)</th>
-              <th style={{ textAlign: 'right' }}>Capacity (MW)</th>
+              <th style={{ textAlign: 'right' }} className={styles.capacityColumn}>Capacity (MW)</th>
               <th>Utilization</th>
             </tr>
           </thead>
@@ -75,7 +75,7 @@ export default function GenerationBySource() {
                   <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
                     {Math.round(row.output_mw).toLocaleString()}
                   </td>
-                  <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                  <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }} className={styles.capacityColumn}>
                     {Math.round(row.capacity_mw).toLocaleString()}
                   </td>
                   <td>

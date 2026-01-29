@@ -71,9 +71,9 @@
 
 .mainContent {
   display: grid;
-  grid-template-columns: 480px 1fr 420px;
-  gap: 16px;
-  padding: 16px;
+  grid-template-columns: minmax(280px, 420px) 1fr minmax(260px, 380px);
+  gap: 12px;
+  padding: 12px;
   max-width: 1920px;
   margin: 0 auto;
 }
@@ -83,11 +83,85 @@
 .rightPanel {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
+  min-width: 0;
 }
 
+/* Large laptop breakpoint - use percentage caps to keep center dominant */
 @media (max-width: 1600px) {
   .mainContent {
+    /* Sidebars capped at 23% + 21% = 44%, center gets 56%+ */
+    grid-template-columns: minmax(260px, 23%) 1fr minmax(240px, 21%);
+    gap: 10px;
+    padding: 10px;
+  }
+
+  .leftPanel,
+  .centerPanel,
+  .rightPanel {
+    gap: 10px;
+  }
+}
+
+/* Medium laptop breakpoint - tighter percentage caps */
+@media (max-width: 1400px) {
+  .mainContent {
+    /* Sidebars capped at 22% + 20% = 42%, center gets 58%+ */
+    grid-template-columns: minmax(240px, 22%) 1fr minmax(220px, 20%);
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .leftPanel,
+  .centerPanel,
+  .rightPanel {
+    gap: 8px;
+  }
+}
+
+/* Small laptop breakpoint - minimum viable with center priority */
+@media (max-width: 1200px) {
+  .mainContent {
+    /* Sidebars capped at 21% + 19% = 40%, center gets 60%+ */
+    grid-template-columns: minmax(220px, 21%) 1fr minmax(200px, 19%);
+    gap: 6px;
+    padding: 6px;
+  }
+
+  .leftPanel,
+  .centerPanel,
+  .rightPanel {
+    gap: 6px;
+  }
+}
+
+/* Compact laptop breakpoint - tight but center still dominant */
+@media (max-width: 1024px) {
+  .mainContent {
+    /* Sidebars capped at 20% + 18% = 38%, center gets 62%+ */
+    grid-template-columns: minmax(200px, 20%) 1fr minmax(180px, 18%);
+    gap: 5px;
+    padding: 5px;
+  }
+
+  .leftPanel,
+  .centerPanel,
+  .rightPanel {
+    gap: 5px;
+  }
+}
+
+/* Mobile/tablet - single column */
+@media (max-width: 900px) {
+  .mainContent {
     grid-template-columns: 1fr;
+    gap: 12px;
+    padding: 12px;
+  }
+
+  .leftPanel,
+  .centerPanel,
+  .rightPanel {
+    gap: 12px;
   }
 }

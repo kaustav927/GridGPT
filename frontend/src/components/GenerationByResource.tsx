@@ -9,6 +9,7 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
+  Tooltip,
 } from 'recharts';
 import styles from './GenerationByResource.module.css';
 
@@ -149,6 +150,15 @@ export default function GenerationByResource() {
   const [generators, setGenerators] = useState<Generator[]>([]);
   const [genHistory, setGenHistory] = useState<HistoryPoint[]>([]);
   const [loading, setLoading] = useState(true);
+  const [viewportWidth, setViewportWidth] = useState(
+    typeof window !== 'undefined' ? window.innerWidth : 1920
+  );
+
+  useEffect(() => {
+    const handleResize = () => setViewportWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const fetchData = useCallback(async () => {
     try {
@@ -282,6 +292,7 @@ export default function GenerationByResource() {
                     key={plant.name}
                     plant={plant}
                     color={section.color}
+                    hideYAxis={viewportWidth <= 1024 && viewportWidth > 900}
                   />
                 ))}
               </div>
@@ -297,7 +308,7 @@ export default function GenerationByResource() {
 // Plant chart card
 // ---------------------------------------------------------------------------
 
-function PlantChart({ plant, color }: { plant: PlantData; color: string }) {
+function PlantChart({ plant, color, hideYAxis }: { plant: PlantData; color: string; hideYAxis: boolean }) {
   const chartData =
     plant.history.length > 0
       ? plant.history
@@ -332,17 +343,28 @@ function PlantChart({ plant, color }: { plant: PlantData; color: string }) {
               tickLine={false}
               interval={0}
             />
-            <YAxis
-              domain={[0, yMax]}
-              tick={{
-                fontSize: 8,
-                fill: '#8B949E',
-                fontFamily: "'JetBrains Mono', monospace",
+            {!hideYAxis && (
+              <YAxis
+                domain={[0, yMax]}
+                tick={{
+                  fontSize: 8,
+                  fill: '#8B949E',
+                  fontFamily: "'JetBrains Mono', monospace",
+                }}
+                axisLine={{ stroke: '#30363D' }}
+                tickLine={false}
+                width={36}
+                tickFormatter={(v: number) => `${v}`}
+              />
+            )}
+            <Tooltip
+              contentStyle={{
+                background: '#161B22',
+                border: '1px solid #30363D',
+                borderRadius: 0,
+                fontSize: '10px',
               }}
-              axisLine={{ stroke: '#30363D' }}
-              tickLine={false}
-              width={36}
-              tickFormatter={(v: number) => `${v}`}
+              formatter={(value) => [`${Math.round(value as number).toLocaleString()} MW`, 'Output']}
             />
             <Area
               type="monotone"

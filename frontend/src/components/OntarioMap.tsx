@@ -497,15 +497,15 @@ export default function OntarioMap({ onZoneSelect, selectedZone }: Props) {
     <Card className={styles.card} style={{ aspectRatio: '1 / 0.85', position: 'relative', display: 'flex', flexDirection: 'column' }}>
       <div className={styles.headerRow}>
         <h2 className={styles.header}>ONTARIO ZONE MAP</h2>
-        <div style={{ display: 'flex', gap: '16px', fontSize: '10px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', fontSize: '10px', alignItems: 'center' }}>
           {avgPrice !== null && (
-            <div style={{ color: '#8B949E' }}>
-              Avg Price: <span style={{ color: priceToColor(avgPrice), fontWeight: 600 }}>${avgPrice.toFixed(2)}/MWh</span>
+            <div style={{ color: '#8B949E', whiteSpace: 'nowrap' }}>
+              Avg: <span style={{ color: priceToColor(avgPrice), fontWeight: 600 }}>${avgPrice.toFixed(2)}</span>
             </div>
           )}
           {showPricing && (
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <span style={{ color: '#8B949E' }}>Price:</span>
+            <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+              <span style={{ color: '#8B949E' }}>$:</span>
               <div style={{ display: 'flex', gap: '2px' }}>
                 {([
                   { color: '#3FB950', label: '< $0', desc: 'Surplus' },
@@ -526,21 +526,20 @@ export default function OntarioMap({ onZoneSelect, selectedZone }: Props) {
                       </div>
                     }
                   >
-                    <div style={{ width: 12, height: 12, background: tier.color, cursor: 'default' }} />
+                    <div style={{ width: 10, height: 10, background: tier.color, cursor: 'default' }} />
                   </Tooltip>
                 ))}
               </div>
             </div>
           )}
           {showGeneration && (
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
               <span style={{ color: '#8B949E' }}>Fuel:</span>
-              <div style={{ display: 'flex', gap: '6px' }}>
+              <div style={{ display: 'flex', gap: '3px' }}>
                 {Object.entries(FUEL_COLORS).map(([fuel, color]) => (
-                  <div key={fuel} style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: color }} />
-                    <span style={{ color: '#8B949E', textTransform: 'capitalize', fontSize: '9px' }}>{fuel}</span>
-                  </div>
+                  <Tooltip key={fuel} content={<span style={{ textTransform: 'capitalize' }}>{fuel}</span>}>
+                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: color, cursor: 'default' }} />
+                  </Tooltip>
                 ))}
               </div>
             </div>
@@ -564,43 +563,39 @@ export default function OntarioMap({ onZoneSelect, selectedZone }: Props) {
       )}
 
       <div className={styles.weatherBar}>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <button
-            className={showPricing ? styles.weatherBtnActive : styles.weatherBtn}
-            onClick={() => setShowPricing((v) => !v)}
-          >
-            <Icon icon="dollar" size={14} />
-            <span>Pricing</span>
-          </button>
-          <button
-            className={showGeneration ? styles.weatherBtnActive : styles.weatherBtn}
-            onClick={() => setShowGeneration((v) => !v)}
-          >
-            <Icon icon="flash" size={14} />
-            <span>Generation</span>
-          </button>
-          <button
-            className={showTransmission ? styles.weatherBtnActive : styles.weatherBtn}
-            onClick={() => setShowTransmission((v) => !v)}
-          >
-            <Icon icon="route" size={14} />
-            <span>Transmission</span>
-          </button>
-        </div>
-        <div style={{ display: 'flex', gap: '8px', marginLeft: 'auto' }}>
-          <button className={styles.weatherBtn}>
-            <Icon icon="temperature" size={14} />
-            <span>Temperature</span>
-          </button>
-          <button className={styles.weatherBtn}>
-            <Icon icon="wind" size={14} />
-            <span>Wind</span>
-          </button>
-          <button className={styles.weatherBtn}>
-            <Icon icon="cloud" size={14} />
-            <span>Precipitation</span>
-          </button>
-        </div>
+        <button
+          className={showPricing ? styles.weatherBtnActive : styles.weatherBtn}
+          onClick={() => setShowPricing((v) => !v)}
+        >
+          <Icon icon="dollar" size={12} />
+          <span>Pricing</span>
+        </button>
+        <button
+          className={showGeneration ? styles.weatherBtnActive : styles.weatherBtn}
+          onClick={() => setShowGeneration((v) => !v)}
+        >
+          <Icon icon="flash" size={12} />
+          <span>Generation</span>
+        </button>
+        <button
+          className={showTransmission ? styles.weatherBtnActive : styles.weatherBtn}
+          onClick={() => setShowTransmission((v) => !v)}
+        >
+          <Icon icon="route" size={12} />
+          <span>Transmission</span>
+        </button>
+        <button className={styles.weatherBtn}>
+          <Icon icon="temperature" size={12} />
+          <span>Temp</span>
+        </button>
+        <button className={styles.weatherBtn}>
+          <Icon icon="wind" size={12} />
+          <span>Wind</span>
+        </button>
+        <button className={styles.weatherBtn}>
+          <Icon icon="cloud" size={12} />
+          <span>Precip</span>
+        </button>
       </div>
 
       <style jsx global>{`
