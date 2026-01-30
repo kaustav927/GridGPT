@@ -48,8 +48,14 @@ export interface SupplyHistoryPoint {
   total_mw: number;
 }
 
+export interface GridLoadHistoryPoint {
+  timestamp: string;
+  grid_load_mw: number;
+}
+
 export interface MarketHistoryResponse {
   demand: DemandHistoryPoint[];
+  gridLoad: GridLoadHistoryPoint[];
   price: PriceHistoryPoint[];
   supply: SupplyHistoryPoint[];
   hours: number;

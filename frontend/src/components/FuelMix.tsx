@@ -14,7 +14,8 @@ interface FuelMixData {
 interface ApiResponse {
   data: FuelMixData[];
   total_mw: number;
-  timestamp: string;
+  data_timestamp: string;
+  is_approximate: boolean;
 }
 
 const FUEL_COLORS: Record<string, string> = {
@@ -26,9 +27,19 @@ const FUEL_COLORS: Record<string, string> = {
   BIOFUEL: '#8B949E',
 };
 
+function formatAsOfTime(timestamp: string): string {
+  const date = new Date(timestamp);
+  return date.toLocaleTimeString('en-CA', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+}
+
 export default function FuelMix() {
   const [data, setData] = useState<FuelMixData[]>([]);
   const [total, setTotal] = useState(0);
+  const [dataTimestamp, setDataTimestamp] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedFuel, setSelectedFuel] = useState<string | null>(null);
 
@@ -38,6 +49,7 @@ export default function FuelMix() {
       const json: ApiResponse = await res.json();
       setData(json.data);
       setTotal(json.total_mw);
+      setDataTimestamp(json.data_timestamp);
     } catch (error) {
       console.error('Failed to fetch fuel mix:', error);
     } finally {
@@ -59,7 +71,12 @@ export default function FuelMix() {
 
   return (
     <Card className={styles.card}>
-      <h2 className={styles.header}>FUEL MIX</h2>
+      <div className={styles.headerRow}>
+        <h2 className={styles.header}>FUEL MIX</h2>
+        {dataTimestamp && (
+          <span className={styles.asOfTime}>As of {formatAsOfTime(dataTimestamp)}</span>
+        )}
+      </div>
       {loading ? (
         <div className={styles.loading}>
           <Spinner size={24} />
@@ -95,7 +112,7 @@ export default function FuelMix() {
             <div className={styles.centerLabel}>
               <div className={styles.centerLabelTop}>{displayLabel}</div>
               <div className={styles.centerLabelValue}>
-                {Math.round(displayValue).toLocaleString()}
+                ~{Math.round(displayValue).toLocaleString()}
               </div>
               <div className={styles.centerLabelUnit}>MW</div>
             </div>

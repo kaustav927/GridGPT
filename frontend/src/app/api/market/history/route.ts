@@ -6,6 +6,11 @@ interface DemandRow {
   demand_mw: number;
 }
 
+interface GridLoadRow {
+  timestamp: string;
+  grid_load_mw: number;
+}
+
 interface PriceRow {
   timestamp: string;
   price: number;
@@ -29,22 +34,26 @@ export async function GET(request: Request) {
     // Execute all queries in parallel for efficiency
     // All queries use deduplication to handle duplicate historical data
     // from producer polling cycles
-    const [demandData, priceData, supplyData] = await Promise.all([
-      // Aggregate demand with deduplication
-      // Deduplicate by (timestamp, zone), then sum across zones
+    const [demandData, gridLoadData, priceData, supplyData] = await Promise.all([
+      // Ontario Demand (internal consumption)
       query<DemandRow>(`
         SELECT
-          timestamp,
-          sum(demand_mw) as demand_mw
-        FROM (
-          SELECT
-            toStartOfFiveMinutes(timestamp) as timestamp,
-            zone,
-            anyLast(demand_mw) as demand_mw
-          FROM ieso.zonal_demand
-          WHERE timestamp >= now() - INTERVAL 5 HOUR - INTERVAL ${hours} HOUR
-          GROUP BY timestamp, zone
-        )
+          toStartOfFiveMinutes(timestamp) as timestamp,
+          anyLast(demand_mw) as demand_mw
+        FROM ieso.zonal_demand
+        WHERE zone = 'ONTARIO'
+          AND timestamp >= now() - INTERVAL 5 HOUR - INTERVAL ${hours} HOUR
+        GROUP BY timestamp
+        ORDER BY timestamp ASC
+      `),
+      // Grid Load (Total Load = Supply minus transmission losses)
+      query<GridLoadRow>(`
+        SELECT
+          toStartOfFiveMinutes(timestamp) as timestamp,
+          anyLast(demand_mw) as grid_load_mw
+        FROM ieso.zonal_demand
+        WHERE zone = 'GRID_LOAD'
+          AND timestamp >= now() - INTERVAL 5 HOUR - INTERVAL ${hours} HOUR
         GROUP BY timestamp
         ORDER BY timestamp ASC
       `),
@@ -117,6 +126,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       demand: demandData,
+      gridLoad: gridLoadData,
       price: priceData,
       supply: validSupplyData,
       hours,

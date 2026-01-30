@@ -35,6 +35,7 @@ interface ChartDataPoint {
   timestamp: number;
   time: string;
   demand_mw: number | null;
+  grid_load_mw: number | null;
   price: number | null;
   supply_mw: number | null;
 }
@@ -67,6 +68,55 @@ interface CustomTooltipProps {
   }>;
   label?: number;
 }
+
+// Legend item with tooltip
+interface LegendItemProps {
+  color: string;
+  label: string;
+  value: number | null;
+  tooltip: string;
+  isPrice?: boolean;
+}
+
+const LegendItem = ({ color, label, value, tooltip, isPrice }: LegendItemProps) => {
+  const [showTooltip, setShowTooltip] = useState(false);
+
+  return (
+    <div
+      style={{ display: 'flex', alignItems: 'center', gap: '6px', position: 'relative' }}
+      onMouseEnter={() => setShowTooltip(true)}
+      onMouseLeave={() => setShowTooltip(false)}
+    >
+      <div style={{ width: 12, height: 2, background: color }} />
+      <span style={{ color: '#8B949E', cursor: 'help' }}>{label}</span>
+      {value !== null && (
+        <span style={{ color, fontWeight: 600 }}>
+          {isPrice ? formatPrice(value) : `${formatNumber(value)} MW`}
+        </span>
+      )}
+      {showTooltip && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '100%',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            marginTop: '6px',
+            padding: '6px 10px',
+            background: '#161B22',
+            border: '1px solid #30363D',
+            fontSize: '9px',
+            color: '#8B949E',
+            whiteSpace: 'nowrap',
+            zIndex: 1000,
+          }}
+        >
+          {tooltip}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
   if (!active || !payload || !payload.length || label === undefined) return null;
@@ -184,6 +234,7 @@ export default function MarketChart() {
 
     for (let t = startTime; t <= now; t += interval) {
       const demand = findNearestValue(rawData.demand, t, 'demand_mw', maxDiff);
+      const gridLoad = findNearestValue(rawData.gridLoad || [], t, 'grid_load_mw', maxDiff);
       const price = findNearestValue(rawData.price, t, 'price', maxDiff);
       const supply = findNearestValue(rawData.supply, t, 'total_mw', supplyMaxDiff);
 
@@ -191,6 +242,7 @@ export default function MarketChart() {
         timestamp: t,
         time: formatTimeLabel(t),
         demand_mw: demand,
+        grid_load_mw: gridLoad,
         price: price,
         supply_mw: supply,
       });
@@ -202,21 +254,24 @@ export default function MarketChart() {
   // Calculate stats for display
   const stats = useMemo(() => {
     const validDemand = chartData.filter(d => d.demand_mw !== null);
+    const validGridLoad = chartData.filter(d => d.grid_load_mw !== null);
     const validPrice = chartData.filter(d => d.price !== null);
     const validSupply = chartData.filter(d => d.supply_mw !== null);
 
     const currentDemand = validDemand.length > 0 ? validDemand[validDemand.length - 1]?.demand_mw : null;
+    const currentGridLoad = validGridLoad.length > 0 ? validGridLoad[validGridLoad.length - 1]?.grid_load_mw : null;
     const currentPrice = validPrice.length > 0 ? validPrice[validPrice.length - 1]?.price : null;
     const currentSupply = validSupply.length > 0 ? validSupply[validSupply.length - 1]?.supply_mw : null;
     const avgPrice = validPrice.length > 0
       ? validPrice.reduce((sum, d) => sum + (d.price || 0), 0) / validPrice.length
       : null;
 
-    return { currentDemand, currentPrice, currentSupply, avgPrice };
+    return { currentDemand, currentGridLoad, currentPrice, currentSupply, avgPrice };
   }, [chartData]);
 
   // Check if we have any data
   const hasData = chartData.some(d => d.demand_mw !== null || d.price !== null);
+  const hasGridLoad = chartData.some(d => d.grid_load_mw !== null);
   const hasSupply = chartData.some(d => d.supply_mw !== null);
 
   // Calculate tick count based on time range
@@ -245,36 +300,36 @@ export default function MarketChart() {
             ))}
           </ButtonGroup>
         </div>
-        <div style={{ display: 'flex', gap: '20px', fontSize: '10px', alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <div style={{ width: 12, height: 2, background: '#39D5FF' }} />
-            <span style={{ color: '#8B949E' }}>Demand</span>
-            {stats.currentDemand !== null && (
-              <span style={{ color: '#39D5FF', fontWeight: 600 }}>
-                {formatNumber(stats.currentDemand)} MW
-              </span>
-            )}
-          </div>
-          {hasSupply && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <div style={{ width: 12, height: 2, background: '#3FB950' }} />
-              <span style={{ color: '#8B949E' }}>Supply</span>
-              {stats.currentSupply !== null && (
-                <span style={{ color: '#3FB950', fontWeight: 600 }}>
-                  {formatNumber(stats.currentSupply)} MW
-                </span>
-              )}
-            </div>
+        <div style={{ display: 'flex', gap: '16px', fontSize: '10px', alignItems: 'center' }}>
+          <LegendItem
+            color="#39D5FF"
+            label="Demand"
+            value={stats.currentDemand}
+            tooltip="Ontario's internal electricity consumption"
+          />
+          {hasGridLoad && (
+            <LegendItem
+              color="#A371F7"
+              label="Grid Load"
+              value={stats.currentGridLoad}
+              tooltip="Supply minus transmission losses"
+            />
           )}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <div style={{ width: 12, height: 2, background: '#D29922' }} />
-            <span style={{ color: '#8B949E' }}>Price</span>
-            {stats.currentPrice !== null && (
-              <span style={{ color: '#D29922', fontWeight: 600 }}>
-                {formatPrice(stats.currentPrice)}
-              </span>
-            )}
-          </div>
+          {hasSupply && (
+            <LegendItem
+              color="#3FB950"
+              label="Supply"
+              value={stats.currentSupply}
+              tooltip="Total generation dispatched to the grid"
+            />
+          )}
+          <LegendItem
+            color="#D29922"
+            label="Price"
+            value={stats.currentPrice}
+            isPrice
+            tooltip="Average Ontario electricity price"
+          />
           {stats.avgPrice !== null && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <span style={{ color: '#8B949E' }}>Avg:</span>
@@ -301,6 +356,10 @@ export default function MarketChart() {
               <linearGradient id="demandGradient" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="#39D5FF" stopOpacity={0.3} />
                 <stop offset="95%" stopColor="#39D5FF" stopOpacity={0} />
+              </linearGradient>
+              <linearGradient id="gridLoadGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#A371F7" stopOpacity={0.2} />
+                <stop offset="95%" stopColor="#A371F7" stopOpacity={0} />
               </linearGradient>
               <linearGradient id="supplyGradient" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="#3FB950" stopOpacity={0.15} />
@@ -374,6 +433,21 @@ export default function MarketChart() {
                 fill="url(#supplyGradient)"
                 strokeWidth={1}
                 name="Supply"
+                connectNulls
+                isAnimationActive={false}
+              />
+            )}
+
+            {/* Grid Load line - only if data exists */}
+            {hasGridLoad && (
+              <Area
+                yAxisId="left"
+                type="monotone"
+                dataKey="grid_load_mw"
+                stroke="#A371F7"
+                fill="url(#gridLoadGradient)"
+                strokeWidth={1.5}
+                name="Grid Load"
                 connectNulls
                 isAnimationActive={false}
               />

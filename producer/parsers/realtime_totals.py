@@ -26,7 +26,7 @@ NS = {"ieso": "http://www.ieso.ca/schema"}
 class RealtimeDemandRecord(TypedDict):
     """Schema for realtime demand records."""
     timestamp: str
-    zone: str  # Always "ONTARIO" for this report
+    zone: str  # "ONTARIO" for Ontario demand, "GRID_LOAD" for total grid load
     demand_mw: float
 
 
@@ -111,6 +111,13 @@ async def fetch_realtime_totals() -> tuple[list[RealtimeDemandRecord], list[Real
                     demand_records.append({
                         "timestamp": ts_str,
                         "zone": "ONTARIO",
+                        "demand_mw": mw_value,
+                    })
+                elif market_qty == "Total Load":
+                    # Total Load = Total Energy - Total Loss (grid load including exports)
+                    demand_records.append({
+                        "timestamp": ts_str,
+                        "zone": "GRID_LOAD",
                         "demand_mw": mw_value,
                     })
                 elif market_qty == "Total Energy":
