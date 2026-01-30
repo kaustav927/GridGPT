@@ -4,7 +4,6 @@ import { useEffect, useState, useCallback } from 'react';
 import { Icon } from '@blueprintjs/core';
 import styles from './dashboard.module.css';
 import FuelMix from '@/components/FuelMix';
-import GenerationBySource from '@/components/GenerationBySource';
 import GenerationByResource from '@/components/GenerationByResource';
 import OntarioMap from '@/components/OntarioMap';
 import MarketChart from '@/components/MarketChart';
@@ -69,7 +68,6 @@ export default function Dashboard() {
         {/* Left Panel */}
         <div className={styles.leftPanel}>
           <FuelMix />
-          <GenerationBySource />
           <GenerationByResource />
         </div>
 

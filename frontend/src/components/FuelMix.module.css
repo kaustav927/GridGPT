@@ -3,13 +3,23 @@
   border: 1px solid var(--border-color) !important;
   border-radius: 0 !important;
   padding: 20px !important;
+  overflow: visible !important; /* Allow tooltips to render outside card bounds */
+  position: relative;
+  z-index: 10; /* Ensure tooltips appear above adjacent cards */
+}
+
+/* When hovering on the card, boost z-index so tooltips appear above everything */
+.card:hover {
+  z-index: 100;
 }
 
 .headerRow {
   display: flex;
   justify-content: space-between;
-  align-items: baseline;
+  align-items: center;
   margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .header {
@@ -20,79 +30,281 @@
   color: var(--text-primary);
 }
 
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .asOfTime {
   font-size: 10px;
   color: var(--text-secondary);
   font-variant-numeric: tabular-nums;
 }
 
+/* Toggle button group */
+.toggleGroup {
+  background: #21262D !important;
+}
+
+.toggleButton {
+  font-size: 10px !important;
+  padding: 2px 8px !important;
+  min-height: 22px !important;
+  color: var(--text-secondary) !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.toggleButton:hover {
+  background: #30363D !important;
+  color: var(--text-primary) !important;
+}
+
+.toggleButton:global(.bp5-active) {
+  background: #30363D !important;
+  color: var(--text-primary) !important;
+}
+
 .loading {
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 240px;
+  height: 280px;
+}
+
+/* Content area for click-to-deselect */
+.contentArea {
+  cursor: default;
+}
+
+/* ---------------------------------------------------------------------------
+   Unified Output Label (below chart - used by both Donut and Radar)
+   --------------------------------------------------------------------------- */
+
+.outputLabel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 8px;
+  padding-top: 4px;
+}
+
+.outputLabelText {
+  font-size: 10px;
+  color: var(--text-secondary);
+  letter-spacing: 0.02em;
+}
+
+.outputLabelValue {
+  font-size: 20px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+/* ---------------------------------------------------------------------------
+   Donut View
+   --------------------------------------------------------------------------- */
+
+.donutWrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  z-index: 1;
+}
+
+/* Ensure Nivo tooltips are visible above other elements */
+.donutWrapper :global(div[style*="pointer-events"]) {
+  z-index: 100 !important;
 }
 
 .chartContainer {
   position: relative;
-  height: 240px;
+  height: 200px;
+  width: 100%;
+  /* Note: overflow visible to allow tooltips - hover expansion disabled via activeOuterRadiusOffset={0} */
 }
 
-.centerLabel {
+.innerRingContainer {
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  text-align: center;
-  pointer-events: none;
+  width: 52%;
+  height: 52%;
+  pointer-events: auto;
 }
 
-.centerLabelTop {
+/* ---------------------------------------------------------------------------
+   Table View
+   --------------------------------------------------------------------------- */
+
+.tableContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.table {
+  width: 100%;
+  font-size: 11px;
+}
+
+.table th {
+  font-size: 10px;
+  color: #8B949E !important;
+  font-weight: normal;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 6px 8px !important;
+}
+
+.table td {
+  font-family: 'JetBrains Mono', monospace;
+  color: #E6EDF3 !important;
+  padding: 6px 8px !important;
+}
+
+.utilizationCell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.utilizationBar {
+  flex: 1;
+  height: 6px;
+  background: #21262D;
+  min-width: 50px;
+}
+
+.utilizationFill {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.utilizationText {
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  color: #8B949E;
+  min-width: 32px;
+  text-align: right;
+}
+
+/* Capacity column for responsive hiding */
+.capacityColumn {}
+
+/* Energy flow summary (shown below table) */
+.energyFlowSummary {
+  display: flex;
+  justify-content: space-around;
+  padding: 8px 0;
+  border-top: 1px solid #21262D;
+}
+
+.flowItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.flowDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 0;
+}
+
+.flowLabel {
   font-size: 10px;
   color: var(--text-secondary);
-  margin-bottom: 4px;
 }
 
-.centerLabelValue {
-  font-size: 28px;
+.flowValue {
+  font-size: 10px;
   font-weight: 600;
-  color: var(--text-primary);
   font-variant-numeric: tabular-nums;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--text-primary);
 }
 
-.centerLabelUnit {
-  font-size: 11px;
-  color: var(--text-secondary);
-  margin-top: 4px;
+/* ---------------------------------------------------------------------------
+   Radar View
+   --------------------------------------------------------------------------- */
+
+.radarContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
-/* Responsive breakpoints */
+/* ---------------------------------------------------------------------------
+   Responsive Breakpoints
+   --------------------------------------------------------------------------- */
+
 @media (max-width: 1400px) {
-  .chartContainer { height: 220px; }
-  .loading { height: 220px; }
-  .centerLabelValue { font-size: 24px; }
+  .chartContainer { height: 180px; }
+  .loading { height: 260px; }
+  .outputLabelValue { font-size: 18px; }
+  .outputLabelText { font-size: 9px; }
+  .table { font-size: 10px; }
+  .table th { font-size: 9px; }
+  .utilizationBar { min-width: 40px; }
+  .utilizationText { min-width: 28px; font-size: 9px; }
+  .flowLabel { font-size: 9px; }
+  .flowValue { font-size: 9px; }
 }
 
 @media (max-width: 1200px) {
-  .chartContainer { height: 200px; }
-  .loading { height: 200px; }
-  .centerLabelValue { font-size: 22px; }
-  .centerLabelTop { font-size: 9px; }
-  .centerLabelUnit { font-size: 10px; }
+  .chartContainer { height: 170px; }
+  .loading { height: 250px; }
+  .outputLabelValue { font-size: 16px; }
+  .table { font-size: 10px; }
+  .utilizationCell { gap: 6px; }
+  .utilizationBar { min-width: 35px; }
+  .utilizationText { min-width: 26px; font-size: 9px; }
+  .energyFlowSummary { flex-wrap: wrap; gap: 8px; }
 }
 
 @media (max-width: 1024px) {
-  .chartContainer { height: 160px; }
-  .loading { height: 160px; }
-  .centerLabelValue { font-size: 18px; }
-  .centerLabelTop { font-size: 8px; margin-bottom: 2px; }
-  .centerLabelUnit { font-size: 9px; margin-top: 2px; }
+  .chartContainer { height: 150px; }
+  .loading { height: 230px; }
+  .outputLabelValue { font-size: 14px; }
+  .outputLabelText { font-size: 8px; }
+  .innerRingContainer { width: 48%; height: 48%; }
+  .table { font-size: 9px; }
+  .table th { font-size: 8px; padding: 4px 6px !important; }
+  .table td { padding: 4px 6px !important; }
+  /* Hide capacity column on narrow viewports */
+  .capacityColumn { display: none; }
+  .utilizationCell { gap: 4px; }
+  .utilizationBar { min-width: 30px; }
+  .utilizationText { min-width: 24px; font-size: 8px; }
+  .toggleButton { font-size: 9px !important; padding: 2px 6px !important; }
+  .flowLabel { font-size: 8px; }
+  .flowValue { font-size: 8px; }
+  .flowDot { width: 6px; height: 6px; }
 }
 
 @media (max-width: 900px) {
-  .chartContainer { height: 240px; }
-  .loading { height: 240px; }
-  .centerLabelValue { font-size: 28px; }
-  .centerLabelTop { font-size: 10px; margin-bottom: 4px; }
-  .centerLabelUnit { font-size: 11px; margin-top: 4px; }
+  .chartContainer { height: 200px; }
+  .loading { height: 280px; }
+  .outputLabelValue { font-size: 20px; }
+  .outputLabelText { font-size: 10px; }
+  .innerRingContainer { width: 52%; height: 52%; }
+  .table { font-size: 11px; }
+  .table th { font-size: 10px; padding: 8px 10px !important; }
+  .table td { padding: 8px 10px !important; }
+  .capacityColumn { display: table-cell; } /* Restore on mobile */
+  .utilizationCell { gap: 8px; }
+  .utilizationBar { min-width: 50px; }
+  .utilizationText { min-width: 32px; font-size: 10px; }
+  .headerRow { flex-direction: column; align-items: flex-start; }
+  .headerRight { width: 100%; justify-content: space-between; }
+  .toggleButton { font-size: 10px !important; padding: 2px 8px !important; }
+  .flowLabel { font-size: 10px; }
+  .flowValue { font-size: 10px; }
+  .flowDot { width: 8px; height: 8px; }
 }

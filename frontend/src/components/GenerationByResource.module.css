@@ -59,6 +59,14 @@
   background: #21262D;
 }
 
+/* --- 2-column plant grid for sections with fewer plants --- */
+.plantGridTwo {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1px;
+  background: #21262D;
+}
+
 /* --- Individual plant chart card --- */
 .plantCard {
   display: flex;
@@ -71,9 +79,9 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 3px 6px;
-  gap: 4px;
-  min-height: 20px;
+  padding: 2px 2px;
+  gap: 3px;
+  min-height: 18px;
 }
 
 .plantName {
@@ -137,4 +145,28 @@
   .plantName { font-size: 10px; }
   .plantMw { font-size: 11px; }
   .chartArea { height: 80px; }
+}
+
+/* --- Manual X-axis labels (bypasses Recharts tick issues) --- */
+.xAxisLabels {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 4px;
+  margin-top: -20px;
+  margin-bottom: 10px;
+}
+
+.xAxisLabelLeft,
+.xAxisLabelRight {
+  font-size: 8px;
+  font-family: 'JetBrains Mono', monospace;
+  color: #C9D1D9;
+}
+
+.xAxisLabelLeft {
+  text-align: left;
+}
+
+.xAxisLabelRight {
+  text-align: right;
 }

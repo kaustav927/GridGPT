@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { useEffect, useState, useMemo, useCallback } from 'react';
-import { Card, Spinner } from '@blueprintjs/core';
+import { useEffect, useState, useMemo, useCallback } from "react";
+import { Card, Spinner } from "@blueprintjs/core";
 import {
   AreaChart,
   Area,
@@ -10,8 +10,8 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-} from 'recharts';
-import styles from './GenerationByResource.module.css';
+} from "recharts";
+import styles from "./GenerationByResource.module.css";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -65,61 +65,61 @@ interface SectionConfig {
 
 const SECTIONS: SectionConfig[] = [
   {
-    id: 'renewable',
-    label: 'Embedded Renewable',
-    color: '#3FB950',
-    bgColor: 'rgba(63, 185, 80, 0.18)',
-    fuelTypes: ['SOLAR', 'WIND'],
+    id: "renewable",
+    label: "Embedded Renewable",
+    color: "#3FB950",
+    bgColor: "rgba(63, 185, 80, 0.18)",
+    fuelTypes: ["SOLAR", "WIND"],
     plants: [
-      { name: 'Solar', prefixes: [] },  // all SOLAR generators
-      { name: 'Wind', prefixes: [] },   // all WIND generators
+      { name: "Solar", prefixes: [] }, // all SOLAR generators
+      { name: "Wind", prefixes: [] }, // all WIND generators
     ],
   },
   {
-    id: 'nuclear',
-    label: 'Nuclear',
-    color: '#3FB950',
-    bgColor: 'rgba(63, 185, 80, 0.15)',
-    fuelTypes: ['NUCLEAR'],
+    id: "nuclear",
+    label: "Nuclear",
+    color: "#3FB950",
+    bgColor: "rgba(63, 185, 80, 0.15)",
+    fuelTypes: ["NUCLEAR"],
     plants: [
-      { name: 'Bruce', prefixes: ['bruce'] },
-      { name: 'Pickering', prefixes: ['pickering'] },
-      { name: 'Darlington', prefixes: ['darlington'] },
+      { name: "Bruce", prefixes: ["bruce"] },
+      { name: "Pickering", prefixes: ["pickering"] },
+      { name: "Darlington", prefixes: ["darlington"] },
     ],
   },
   {
-    id: 'hydro',
-    label: 'Hydro',
-    color: '#58A6FF',
-    bgColor: 'rgba(88, 166, 255, 0.18)',
-    fuelTypes: ['HYDRO'],
+    id: "hydro",
+    label: "Hydro",
+    color: "#58A6FF",
+    bgColor: "rgba(88, 166, 255, 0.18)",
+    fuelTypes: ["HYDRO"],
     plants: [
-      { name: 'Total Hydro', prefixes: [] },
-      { name: 'Beck Complex', prefixes: ['beck'] },
+      { name: "Total Hydro", prefixes: [] },
+      { name: "Beck Complex", prefixes: ["beck"] },
     ],
   },
   {
-    id: 'gas',
-    label: 'Gas',
-    color: '#D29922',
-    bgColor: 'rgba(139, 148, 158, 0.12)',
-    fuelTypes: ['GAS'],
+    id: "gas",
+    label: "Gas",
+    color: "#D29922",
+    bgColor: "rgba(139, 148, 158, 0.12)",
+    fuelTypes: ["GAS"],
     plants: [
-      { name: 'TA Sarnia', prefixes: ['tasarnia'] },
-      { name: 'Goreway', prefixes: ['goreway', 'sithe goreway'] },
-      { name: 'Atikokan', prefixes: ['atikokan'] },
-      { name: 'St. Clair', prefixes: ['stclair'] },
-      { name: 'Portlands', prefixes: ['portlands'] },
-      { name: 'Kirkland Lake', prefixes: ['npkirkland', 'kirkland'] },
-      { name: 'GSPC', prefixes: ['gspc', 'kapgs'] },
-      { name: 'Halton Hills', prefixes: ['haltonhills'] },
-      { name: 'York', prefixes: ['york', 'gtaa'] },
-      { name: 'Greenfield', prefixes: ['greenfield'] },
-      { name: 'Thorold', prefixes: ['thorold'] },
-      { name: 'Lennox', prefixes: ['lennox'] },
-      { name: 'Brighton Beach', prefixes: ['brighton'] },
-      { name: 'East Windsor', prefixes: ['eastwindsor', 'westwindsor'] },
-      { name: 'Napanee', prefixes: ['napanee'] },
+      { name: "TA Sarnia", prefixes: ["tasarnia"] },
+      { name: "Goreway", prefixes: ["goreway", "sithe goreway"] },
+      { name: "Atikokan", prefixes: ["atikokan"] },
+      { name: "St. Clair", prefixes: ["stclair"] },
+      { name: "Portlands", prefixes: ["portlands"] },
+      { name: "Kirkland Lake", prefixes: ["npkirkland", "kirkland"] },
+      { name: "GSPC", prefixes: ["gspc", "kapgs"] },
+      { name: "Halton Hills", prefixes: ["haltonhills"] },
+      { name: "York", prefixes: ["york", "gtaa"] },
+      { name: "Greenfield", prefixes: ["greenfield"] },
+      { name: "Thorold", prefixes: ["thorold"] },
+      { name: "Lennox", prefixes: ["lennox"] },
+      { name: "Brighton Beach", prefixes: ["brighton"] },
+      { name: "East Windsor", prefixes: ["eastwindsor", "westwindsor"] },
+      { name: "Napanee", prefixes: ["napanee"] },
     ],
   },
 ];
@@ -129,8 +129,14 @@ const SECTIONS: SectionConfig[] = [
 // ---------------------------------------------------------------------------
 
 function formatTime(ts: string): string {
+  if (!ts) return "";
   const d = new Date(ts);
-  return d.toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit', hour12: false });
+  if (isNaN(d.getTime())) return "";
+  return d.toLocaleTimeString("en-CA", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
 }
 
 function matchesPlant(generatorName: string, prefixes: string[]): boolean {
@@ -151,20 +157,20 @@ export default function GenerationByResource() {
   const [genHistory, setGenHistory] = useState<HistoryPoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewportWidth, setViewportWidth] = useState(
-    typeof window !== 'undefined' ? window.innerWidth : 1920
+    typeof window !== "undefined" ? window.innerWidth : 1920,
   );
 
   useEffect(() => {
     const handleResize = () => setViewportWidth(window.innerWidth);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
 
   const fetchData = useCallback(async () => {
     try {
       const [genRes, genHistRes] = await Promise.all([
-        fetch('/api/generators?limit=500'),
-        fetch('/api/generators/history?hours=4'),
+        fetch("/api/generators?limit=500"),
+        fetch("/api/generators/history?hours=4"),
       ]);
       const genJson = await genRes.json();
       const genHistJson = await genHistRes.json();
@@ -172,7 +178,7 @@ export default function GenerationByResource() {
       setGenerators(genJson.data ?? []);
       setGenHistory(genHistJson.data ?? []);
     } catch (error) {
-      console.error('Failed to fetch generation data:', error);
+      console.error("Failed to fetch generation data:", error);
     } finally {
       setLoading(false);
     }
@@ -194,7 +200,7 @@ export default function GenerationByResource() {
 
       // For renewable, each plant maps to a specific fuel type (Solar→SOLAR, Wind→WIND)
       // For others, all plants share the section's fuelTypes
-      const isRenewable = section.id === 'renewable';
+      const isRenewable = section.id === "renewable";
 
       for (const plant of section.plants) {
         const isAllAgg = plant.prefixes.length === 0;
@@ -220,8 +226,12 @@ export default function GenerationByResource() {
             matchedGens = sectionGens;
             matchedHist = sectionHist;
           } else {
-            matchedGens = sectionGens.filter((g) => matchesPlant(g.generator, plant.prefixes));
-            matchedHist = sectionHist.filter((h) => matchesPlant(h.generator, plant.prefixes));
+            matchedGens = sectionGens.filter((g) =>
+              matchesPlant(g.generator, plant.prefixes),
+            );
+            matchedHist = sectionHist.filter((h) =>
+              matchesPlant(h.generator, plant.prefixes),
+            );
           }
         }
 
@@ -233,7 +243,9 @@ export default function GenerationByResource() {
           tsMap.set(h.timestamp, (tsMap.get(h.timestamp) || 0) + h.output_mw);
         }
         const history: ChartPoint[] = [];
-        tsMap.forEach((mw, ts) => history.push({ timestamp: ts, output_mw: mw }));
+        tsMap.forEach((mw, ts) =>
+          history.push({ timestamp: ts, output_mw: mw }),
+        );
         history.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
 
         plantDataList.push({
@@ -245,8 +257,8 @@ export default function GenerationByResource() {
 
       // Section total: for hydro, use "Total Hydro" to avoid double-counting
       let sectionTotal: number;
-      if (section.id === 'hydro') {
-        const totalHydro = plantDataList.find((p) => p.name === 'Total Hydro');
+      if (section.id === "hydro") {
+        const totalHydro = plantDataList.find((p) => p.name === "Total Hydro");
         sectionTotal = totalHydro ? totalHydro.output_mw : 0;
       } else {
         sectionTotal = plantDataList.reduce((s, p) => s + p.output_mw, 0);
@@ -257,8 +269,8 @@ export default function GenerationByResource() {
   }, [generators, genHistory]);
 
   // Filter out sections with no data at all
-  const visibleSections = sectionData.filter(
-    (s) => s.plants.some((p) => p.output_mw > 0 || p.history.length > 0),
+  const visibleSections = sectionData.filter((s) =>
+    s.plants.some((p) => p.output_mw > 0 || p.history.length > 0),
   );
 
   return (
@@ -279,14 +291,24 @@ export default function GenerationByResource() {
                   borderLeft: `3px solid ${section.color}`,
                 }}
               >
-                <span className={styles.fuelLabel} style={{ color: section.color }}>
+                <span
+                  className={styles.fuelLabel}
+                  style={{ color: section.color }}
+                >
                   {section.label}
                 </span>
-                <span className={styles.fuelTotal} style={{ color: section.color }}>
+                <span
+                  className={styles.fuelTotal}
+                  style={{ color: section.color }}
+                >
                   {Math.round(total).toLocaleString()}
                 </span>
               </div>
-              <div className={styles.plantGrid}>
+              <div
+                className={
+                  plants.length <= 2 ? styles.plantGridTwo : styles.plantGrid
+                }
+              >
                 {plants.map((plant) => (
                   <PlantChart
                     key={plant.name}
@@ -308,11 +330,28 @@ export default function GenerationByResource() {
 // Plant chart card
 // ---------------------------------------------------------------------------
 
-function PlantChart({ plant, color, hideYAxis }: { plant: PlantData; color: string; hideYAxis: boolean }) {
+function PlantChart({
+  plant,
+  color,
+  hideYAxis,
+}: {
+  plant: PlantData;
+  color: string;
+  hideYAxis: boolean;
+}) {
   const chartData =
     plant.history.length > 0
       ? plant.history
-      : [{ timestamp: '', output_mw: plant.output_mw }];
+      : [{ timestamp: "", output_mw: plant.output_mw }];
+
+  // Calculate first/last timestamps for manual rendering below chart
+  const firstTs = chartData[0]?.timestamp || "";
+  const lastTs = chartData[chartData.length - 1]?.timestamp || "";
+  const firstTimeLabel = formatTime(firstTs);
+  const lastTimeLabel = formatTime(lastTs);
+  // Only show both if they're different
+  const showBothLabels =
+    firstTimeLabel && lastTimeLabel && firstTimeLabel !== lastTimeLabel;
 
   const mwValues = chartData.map((d) => d.output_mw);
   const dataMax = Math.max(...mwValues);
@@ -329,42 +368,44 @@ function PlantChart({ plant, color, hideYAxis }: { plant: PlantData; color: stri
       </div>
       <div className={styles.chartArea}>
         <ResponsiveContainer width="100%" height={90}>
-          <AreaChart data={chartData} margin={{ top: 2, right: 2, bottom: 0, left: 0 }}>
+          <AreaChart
+            data={chartData}
+            margin={{ top: 2, right: 4, bottom: 0, left: 0 }}
+          >
             <CartesianGrid strokeDasharray="3 3" stroke="#21262D" />
             <XAxis
               dataKey="timestamp"
-              tickFormatter={formatTime}
-              tick={{
-                fontSize: 8,
-                fill: '#8B949E',
-                fontFamily: "'JetBrains Mono', monospace",
-              }}
-              axisLine={{ stroke: '#30363D' }}
+              tick={false}
+              axisLine={{ stroke: "#484F58" }}
               tickLine={false}
-              interval={0}
             />
             {!hideYAxis && (
               <YAxis
                 domain={[0, yMax]}
                 tick={{
                   fontSize: 8,
-                  fill: '#8B949E',
+                  fill: "#C9D1D9",
                   fontFamily: "'JetBrains Mono', monospace",
+                  dx: -6,
                 }}
-                axisLine={{ stroke: '#30363D' }}
+                axisLine={{ stroke: "#484F58" }}
                 tickLine={false}
-                width={36}
+                width={2}
                 tickFormatter={(v: number) => `${v}`}
+                mirror
               />
             )}
             <Tooltip
               contentStyle={{
-                background: '#161B22',
-                border: '1px solid #30363D',
+                background: "#161B22",
+                border: "1px solid #30363D",
                 borderRadius: 0,
-                fontSize: '10px',
+                fontSize: "10px",
               }}
-              formatter={(value) => [`${Math.round(value as number).toLocaleString()} MW`, 'Output']}
+              formatter={(value) => [
+                `${Math.round(value as number).toLocaleString()} MW`,
+                "Output",
+              ]}
             />
             <Area
               type="monotone"
@@ -377,6 +418,15 @@ function PlantChart({ plant, color, hideYAxis }: { plant: PlantData; color: stri
             />
           </AreaChart>
         </ResponsiveContainer>
+      </div>
+      {/* Manual X-axis labels - bypasses Recharts tick issues */}
+      <div className={styles.xAxisLabels}>
+        <span className={styles.xAxisLabelLeft}>
+          {showBothLabels ? firstTimeLabel : ""}
+        </span>
+        <span className={styles.xAxisLabelRight}>
+          {lastTimeLabel || firstTimeLabel}
+        </span>
       </div>
     </div>
   );
