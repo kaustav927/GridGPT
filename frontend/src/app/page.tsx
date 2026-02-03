@@ -7,11 +7,7 @@ import FuelMix from '@/components/FuelMix';
 import GenerationByResource from '@/components/GenerationByResource';
 import OntarioMap from '@/components/OntarioMap';
 import MarketChart from '@/components/MarketChart';
-import ZoneDetail from '@/components/ZoneDetail';
 import Interties from '@/components/Interties';
-import NetFlowCarbon from '@/components/NetFlowCarbon';
-import ReserveMargin from '@/components/ReserveMargin';
-import Alerts from '@/components/Alerts';
 
 export default function Dashboard() {
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -82,14 +78,8 @@ export default function Dashboard() {
 
         {/* Right Panel */}
         <div className={styles.rightPanel}>
-          <ZoneDetail
-            selectedZone={selectedZone}
-            onClearSelection={() => handleZoneSelect(null)}
-          />
           <Interties />
-          <NetFlowCarbon />
-          <ReserveMargin />
-          <Alerts />
+          {/* Space reserved for future chatbot */}
         </div>
       </div>
     </div>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { Card, ButtonGroup, Button } from '@blueprintjs/core';
+import { Card, ButtonGroup, Button, Switch, Tooltip } from '@blueprintjs/core';
 import {
   ComposedChart,
   Line,
@@ -9,26 +9,45 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
+  Tooltip as RechartsTooltip,
   ResponsiveContainer,
   ReferenceLine,
 } from 'recharts';
 import styles from './Card.module.css';
-import type { MarketHistoryResponse } from '@/lib/types';
+import type { MarketHistoryResponse, DayAheadResponse, PeakDemandResponse } from '@/lib/types';
 
-type TimeRange = '1H' | '6H' | '24H';
+type TimeRange = '1H' | 'Today';
 
 const TIME_RANGE_HOURS: Record<TimeRange, number> = {
   '1H': 1,
-  '6H': 6,
-  '24H': 24,
+  'Today': 24,
 };
 
 // Interval in milliseconds for each time range
 const TIME_RANGE_INTERVAL: Record<TimeRange, number> = {
   '1H': 5 * 60 * 1000,   // 5 minutes
-  '6H': 15 * 60 * 1000,  // 15 minutes
-  '24H': 30 * 60 * 1000, // 30 minutes
+  'Today': 30 * 60 * 1000, // 30 minutes
+};
+
+// Get today's boundaries in Eastern timezone (00:00 to 24:00)
+const getEasternDayBounds = (): { startOfDay: number; endOfDay: number } => {
+  const now = new Date();
+  const easternDateStr = now.toLocaleDateString('en-CA', {
+    timeZone: 'America/Toronto'
+  });
+  const [year, month, day] = easternDateStr.split('-').map(Number);
+
+  // Check if DST is active by comparing current offset to standard offset
+  const jan = new Date(year, 0, 1);
+  const jul = new Date(year, 6, 1);
+  const stdOffset = Math.max(jan.getTimezoneOffset(), jul.getTimezoneOffset());
+  const isDST = now.getTimezoneOffset() < stdOffset;
+  const utcOffsetHours = isDST ? 4 : 5; // EDT = UTC-4, EST = UTC-5
+
+  const startOfDay = Date.UTC(year, month - 1, day, utcOffsetHours, 0, 0, 0);
+  const endOfDay = startOfDay + 24 * 60 * 60 * 1000;
+
+  return { startOfDay, endOfDay };
 };
 
 interface ChartDataPoint {
@@ -38,6 +57,20 @@ interface ChartDataPoint {
   grid_load_mw: number | null;
   price: number | null;
   supply_mw: number | null;
+  da_demand_mw?: number | null;
+  da_supply_mw?: number | null;
+  da_price?: number | null;
+}
+
+// Visibility state for each line
+interface LineVisibility {
+  demand: boolean;
+  gridLoad: boolean;
+  supply: boolean;
+  price: boolean;
+  projDemand: boolean;
+  projSupply: boolean;
+  projPrice: boolean;
 }
 
 const formatTimeLabel = (timestamp: number): string => {
@@ -48,6 +81,16 @@ const formatTimeLabel = (timestamp: number): string => {
     hour12: false,
     timeZone: 'America/Toronto',
   });
+};
+
+// Get current hour in Eastern timezone
+const getEasternHour = (): number => {
+  const now = new Date();
+  return parseInt(now.toLocaleString('en-US', {
+    hour: '2-digit',
+    hour12: false,
+    timeZone: 'America/Toronto'
+  }));
 };
 
 const formatNumber = (value: number): string => {
@@ -69,27 +112,47 @@ interface CustomTooltipProps {
   label?: number;
 }
 
-// Legend item with tooltip
+// Legend item with tooltip and click-to-toggle
 interface LegendItemProps {
   color: string;
   label: string;
   value: number | null;
   tooltip: string;
   isPrice?: boolean;
+  isDotted?: boolean;
+  isVisible?: boolean;
+  onToggle?: () => void;
 }
 
-const LegendItem = ({ color, label, value, tooltip, isPrice }: LegendItemProps) => {
+const LegendItem = ({ color, label, value, tooltip, isPrice, isDotted, isVisible = true, onToggle }: LegendItemProps) => {
   const [showTooltip, setShowTooltip] = useState(false);
 
   return (
     <div
-      style={{ display: 'flex', alignItems: 'center', gap: '6px', position: 'relative' }}
+      onClick={onToggle}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '6px',
+        position: 'relative',
+        cursor: onToggle ? 'pointer' : 'default',
+        opacity: isVisible ? 1 : 0.4,
+        transition: 'opacity 0.15s ease',
+      }}
       onMouseEnter={() => setShowTooltip(true)}
       onMouseLeave={() => setShowTooltip(false)}
     >
-      <div style={{ width: 12, height: 2, background: color }} />
-      <span style={{ color: '#8B949E', cursor: 'help' }}>{label}</span>
-      {value !== null && (
+      <div
+        style={{
+          width: 12,
+          height: 2,
+          background: isDotted
+            ? `repeating-linear-gradient(90deg, ${color} 0, ${color} 3px, transparent 3px, transparent 6px)`
+            : color,
+        }}
+      />
+      <span style={{ color: '#8B949E', cursor: onToggle ? 'pointer' : 'help' }}>{label}</span>
+      {value !== null && isVisible && (
         <span style={{ color, fontWeight: 600 }}>
           {isPrice ? formatPrice(value) : `${formatNumber(value)} MW`}
         </span>
@@ -111,7 +174,7 @@ const LegendItem = ({ color, label, value, tooltip, isPrice }: LegendItemProps) 
             zIndex: 1000,
           }}
         >
-          {tooltip}
+          {onToggle ? `${tooltip} (click to toggle)` : tooltip}
         </div>
       )}
     </div>
@@ -149,7 +212,7 @@ const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
           >
             <span>{entry.name}:</span>
             <span style={{ fontWeight: 600 }}>
-              {entry.dataKey === 'price'
+              {entry.dataKey === 'price' || entry.dataKey === 'da_price'
                 ? formatPrice(entry.value)
                 : `${formatNumber(entry.value)} MW`}
             </span>
@@ -184,30 +247,81 @@ const findNearestValue = <T extends { timestamp: string }>(
 };
 
 export default function MarketChart() {
-  const [timeRange, setTimeRange] = useState<TimeRange>('6H');
+  const [timeRange, setTimeRange] = useState<TimeRange>('Today');
+  const [showDayAhead, setShowDayAhead] = useState(false);
+  const [forecastTarget, setForecastTarget] = useState<'today' | 'tomorrow'>('today');
   const [rawData, setRawData] = useState<MarketHistoryResponse | null>(null);
+  const [daData, setDaData] = useState<DayAheadResponse | null>(null);
+  const [peakData, setPeakData] = useState<PeakDemandResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Check if tomorrow's forecast data is available (published after 13:00 ET)
+  const isTomorrowAvailable = useMemo(() => {
+    return getEasternHour() >= 13;
+  }, []);
+
+  // Line visibility state - projection demand and price ON by default
+  const [visibleLines, setVisibleLines] = useState<LineVisibility>({
+    demand: true,
+    gridLoad: true,
+    supply: true,
+    price: true,
+    projDemand: true,   // ON by default
+    projSupply: false,  // OFF by default (less clutter)
+    projPrice: true,    // ON by default
+  });
+
+  const toggleLine = (key: keyof LineVisibility) => {
+    setVisibleLines(prev => ({ ...prev, [key]: !prev[key] }));
+  };
 
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       const hours = TIME_RANGE_HOURS[timeRange];
-      const response = await fetch(`/api/market/history?hours=${hours}`);
 
+      // Fetch main market data
+      const response = await fetch(`/api/market/history?hours=${hours}`);
       if (!response.ok) {
         throw new Error('Failed to fetch market data');
       }
-
       const result: MarketHistoryResponse = await response.json();
       setRawData(result);
+
+      // Fetch peak demand data
+      try {
+        const peakResponse = await fetch('/api/peak-demand');
+        if (peakResponse.ok) {
+          const peakResult: PeakDemandResponse = await peakResponse.json();
+          setPeakData(peakResult);
+        }
+      } catch {
+        // Peak data is optional, don't fail if unavailable
+      }
+
+      // Fetch day-ahead data if toggle is on
+      if (showDayAhead) {
+        try {
+          const daResponse = await fetch(`/api/market/day-ahead?date=${forecastTarget}`);
+          if (daResponse.ok) {
+            const daResult: DayAheadResponse = await daResponse.json();
+            setDaData(daResult);
+          }
+        } catch {
+          // DA data is optional, don't fail if unavailable
+        }
+      } else {
+        setDaData(null);
+      }
+
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
       setLoading(false);
     }
-  }, [timeRange]);
+  }, [timeRange, showDayAhead, forecastTarget]);
 
   useEffect(() => {
     fetchData();
@@ -215,14 +329,49 @@ export default function MarketChart() {
     return () => clearInterval(interval);
   }, [fetchData]);
 
+  // Calculate chart time bounds based on time range
+  const chartBounds = useMemo(() => {
+    const now = Date.now();
+
+    if (timeRange === 'Today') {
+      // Fixed day: 00:00 to 24:00 Eastern
+      const { startOfDay, endOfDay } = getEasternDayBounds();
+      return { startTime: startOfDay, endTime: endOfDay };
+    } else {
+      // 1H: rolling window
+      return {
+        startTime: now - 60 * 60 * 1000,
+        endTime: now
+      };
+    }
+  }, [timeRange]);
+
+  // Generate X-axis ticks based on time range
+  const xAxisTicks = useMemo(() => {
+    if (timeRange === 'Today') {
+      // Every hour: 0, 1, 2, ... 24
+      const ticks: number[] = [];
+      for (let h = 0; h <= 24; h += 1) {
+        ticks.push(chartBounds.startTime + h * 60 * 60 * 1000);
+      }
+      return ticks;
+    } else {
+      // 1H: Every 15 minutes
+      const ticks: number[] = [];
+      for (let m = 0; m <= 60; m += 15) {
+        ticks.push(chartBounds.startTime + m * 60 * 1000);
+      }
+      return ticks;
+    }
+  }, [timeRange, chartBounds]);
+
   // Process data into unified time series
   const chartData = useMemo((): ChartDataPoint[] => {
     if (!rawData) return [];
 
-    const hours = TIME_RANGE_HOURS[timeRange];
     const interval = TIME_RANGE_INTERVAL[timeRange];
     const now = Date.now();
-    const startTime = now - hours * 60 * 60 * 1000;
+    const { startTime, endTime } = chartBounds;
 
     // Generate uniform time series
     const points: ChartDataPoint[] = [];
@@ -232,11 +381,25 @@ export default function MarketChart() {
     // Supply data is hourly, so always use 1 hour tolerance regardless of chart interval
     const supplyMaxDiff = 60 * 60 * 1000; // 1 hour in milliseconds
 
-    for (let t = startTime; t <= now; t += interval) {
-      const demand = findNearestValue(rawData.demand, t, 'demand_mw', maxDiff);
-      const gridLoad = findNearestValue(rawData.gridLoad || [], t, 'grid_load_mw', maxDiff);
-      const price = findNearestValue(rawData.price, t, 'price', maxDiff);
-      const supply = findNearestValue(rawData.supply, t, 'total_mw', supplyMaxDiff);
+    for (let t = startTime; t <= endTime; t += interval) {
+      const isFuture = t > now;
+
+      // Only get actual data for past/present
+      const demand = isFuture ? null : findNearestValue(rawData.demand, t, 'demand_mw', maxDiff);
+      const gridLoad = isFuture ? null : findNearestValue(rawData.gridLoad || [], t, 'grid_load_mw', maxDiff);
+      const price = isFuture ? null : findNearestValue(rawData.price, t, 'price', maxDiff);
+      const supply = isFuture ? null : findNearestValue(rawData.supply, t, 'total_mw', supplyMaxDiff);
+
+      // Add day-ahead data if available (for both past comparison and future projection)
+      let da_demand: number | null = null;
+      let da_supply: number | null = null;
+      let da_price: number | null = null;
+
+      if (daData?.data) {
+        da_demand = findNearestValue(daData.data, t, 'da_demand_mw', supplyMaxDiff);
+        da_supply = findNearestValue(daData.data, t, 'da_supply_mw', supplyMaxDiff);
+        da_price = findNearestValue(daData.data, t, 'da_price', supplyMaxDiff);
+      }
 
       points.push({
         timestamp: t,
@@ -245,11 +408,14 @@ export default function MarketChart() {
         grid_load_mw: gridLoad,
         price: price,
         supply_mw: supply,
+        da_demand_mw: da_demand,
+        da_supply_mw: da_supply,
+        da_price: da_price,
       });
     }
 
     return points;
-  }, [rawData, timeRange]);
+  }, [rawData, daData, timeRange, chartBounds]);
 
   // Calculate stats for display
   const stats = useMemo(() => {
@@ -273,46 +439,153 @@ export default function MarketChart() {
   const hasData = chartData.some(d => d.demand_mw !== null || d.price !== null);
   const hasGridLoad = chartData.some(d => d.grid_load_mw !== null);
   const hasSupply = chartData.some(d => d.supply_mw !== null);
+  const hasDaData = chartData.some(d => d.da_demand_mw !== null || d.da_price !== null);
 
-  // Calculate tick count based on time range
-  const tickCount = timeRange === '1H' ? 6 : timeRange === '6H' ? 8 : 12;
+
+  // Dynamic chart title with date
+  const chartTitle = useMemo(() => {
+    const now = new Date();
+    const targetDate = (showDayAhead && forecastTarget === 'tomorrow')
+      ? new Date(now.getTime() + 24 * 60 * 60 * 1000)
+      : now;
+
+    const dateStr = targetDate.toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      timeZone: 'America/Toronto'
+    });
+
+    return `MARKET OVERVIEW — ${dateStr}`;
+  }, [showDayAhead, forecastTarget]);
 
   return (
-    <Card className={styles.card} style={{ height: 320 }}>
-      <div className={styles.headerRow}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <h2 className={styles.header}>MARKET OVERVIEW</h2>
-          <ButtonGroup minimal>
-            {(['1H', '6H', '24H'] as TimeRange[]).map((range) => (
-              <Button
-                key={range}
-                text={range}
-                active={timeRange === range}
-                onClick={() => setTimeRange(range)}
-                style={{
-                  fontSize: '10px',
-                  padding: '2px 8px',
-                  minHeight: 'auto',
-                  background: timeRange === range ? '#30363D' : 'transparent',
-                  color: timeRange === range ? '#E6EDF3' : '#8B949E',
-                }}
-              />
-            ))}
-          </ButtonGroup>
+    <Card className={styles.card} style={{ height: 320, display: 'flex', flexDirection: 'column', padding: '12px 16px' }}>
+      {/* Fixed header section - max 80px with proper spacing */}
+      <div style={{
+        flexShrink: 0,
+        maxHeight: 80,
+        overflow: 'visible',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '8px'
+      }}>
+        {/* Row 1: Title + Controls + Peak Info */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <h2 className={styles.header} style={{ margin: 0 }}>{chartTitle}</h2>
+            <ButtonGroup minimal>
+              {(['1H', 'Today'] as TimeRange[]).map((range) => (
+                <Button
+                  key={range}
+                  text={range}
+                  active={timeRange === range}
+                  onClick={() => setTimeRange(range)}
+                  style={{
+                    fontSize: '10px',
+                    padding: '2px 8px',
+                    minHeight: 'auto',
+                    background: timeRange === range ? '#30363D' : 'transparent',
+                    color: timeRange === range ? '#E6EDF3' : '#8B949E',
+                  }}
+                />
+              ))}
+            </ButtonGroup>
+            <Switch
+              checked={showDayAhead}
+              onChange={(e) => setShowDayAhead((e.target as HTMLInputElement).checked)}
+              innerLabel="Proj"
+              innerLabelChecked="Proj"
+              style={{ marginBottom: 0, fontSize: '10px' }}
+            />
+            {showDayAhead && (
+              <ButtonGroup minimal>
+                <Tooltip
+                  content="Current day forecast (Day D)"
+                  placement="bottom"
+                  minimal
+                >
+                  <Button
+                    text="D"
+                    active={forecastTarget === 'today'}
+                    onClick={() => setForecastTarget('today')}
+                    style={{
+                      fontSize: '9px',
+                      padding: '2px 6px',
+                      minHeight: 'auto',
+                      background: forecastTarget === 'today' ? '#30363D' : 'transparent',
+                      color: forecastTarget === 'today' ? '#E6EDF3' : '#8B949E',
+                    }}
+                  />
+                </Tooltip>
+                <Tooltip
+                  content={
+                    isTomorrowAvailable
+                      ? "Next day forecast (Day D+1)"
+                      : "D+1 forecast available after 13:00 ET"
+                  }
+                  placement="bottom"
+                  minimal
+                >
+                  <Button
+                    text="D+1"
+                    active={forecastTarget === 'tomorrow'}
+                    onClick={() => isTomorrowAvailable && setForecastTarget('tomorrow')}
+                    disabled={!isTomorrowAvailable}
+                    style={{
+                      fontSize: '9px',
+                      padding: '2px 6px',
+                      minHeight: 'auto',
+                      background: forecastTarget === 'tomorrow' ? '#30363D' : 'transparent',
+                      color: !isTomorrowAvailable ? '#484F58' : (forecastTarget === 'tomorrow' ? '#E6EDF3' : '#8B949E'),
+                      cursor: isTomorrowAvailable ? 'pointer' : 'not-allowed',
+                    }}
+                  />
+                </Tooltip>
+              </ButtonGroup>
+            )}
+            {showDayAhead && forecastTarget === 'tomorrow' && !hasDaData && (
+              <span style={{ color: '#D29922', fontSize: '9px' }}>
+                (data pending)
+              </span>
+            )}
+          </div>
+          {peakData && (
+            <div style={{ display: 'flex', gap: '12px', fontSize: '9px', color: '#8B949E' }}>
+              <span>
+                Peak: <span style={{ color: '#39D5FF', fontWeight: 600 }}>
+                  {formatNumber(peakData.today.peakMw)} MW
+                </span> @ {peakData.today.peakHour}:00
+              </span>
+              {peakData.tomorrow && (
+                <span>
+                  Tmrw: <span style={{ color: '#58A6FF', fontWeight: 600 }}>
+                    {formatNumber(peakData.tomorrow.peakMw)} MW
+                  </span> @ {peakData.tomorrow.peakHour}:00
+                </span>
+              )}
+            </div>
+          )}
         </div>
-        <div style={{ display: 'flex', gap: '16px', fontSize: '10px', alignItems: 'center' }}>
+
+        {/* Row 2: Compact legend - single row */}
+        <div style={{ display: 'flex', gap: '12px', fontSize: '9px', alignItems: 'center', flexWrap: 'nowrap' }}>
           <LegendItem
             color="#39D5FF"
             label="Demand"
             value={stats.currentDemand}
             tooltip="Ontario's internal electricity consumption"
+            isVisible={visibleLines.demand}
+            onToggle={() => toggleLine('demand')}
           />
           {hasGridLoad && (
             <LegendItem
               color="#A371F7"
-              label="Grid Load"
+              label="Grid"
               value={stats.currentGridLoad}
               tooltip="Supply minus transmission losses"
+              isVisible={visibleLines.gridLoad}
+              onToggle={() => toggleLine('gridLoad')}
             />
           )}
           {hasSupply && (
@@ -321,6 +594,8 @@ export default function MarketChart() {
               label="Supply"
               value={stats.currentSupply}
               tooltip="Total generation dispatched to the grid"
+              isVisible={visibleLines.supply}
+              onToggle={() => toggleLine('supply')}
             />
           )}
           <LegendItem
@@ -329,28 +604,62 @@ export default function MarketChart() {
             value={stats.currentPrice}
             isPrice
             tooltip="Average Ontario electricity price"
+            isVisible={visibleLines.price}
+            onToggle={() => toggleLine('price')}
           />
           {stats.avgPrice !== null && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ color: '#8B949E' }}>Avg:</span>
-              <span style={{ color: '#8B949E', fontWeight: 600 }}>
-                {formatPrice(stats.avgPrice)}
-              </span>
-            </div>
+            <span style={{ color: '#8B949E' }}>
+              Avg: <span style={{ fontWeight: 600 }}>{formatPrice(stats.avgPrice)}</span>
+            </span>
+          )}
+          {showDayAhead && (
+            <>
+              <div style={{ width: 1, height: 10, background: '#30363D' }} />
+              <LegendItem
+                color="#39D5FF"
+                label="Fcst Demand"
+                value={null}
+                tooltip={forecastTarget === 'today' ? "Today's forecasted demand (day-ahead)" : "Tomorrow's projected demand forecast"}
+                isDotted
+                isVisible={visibleLines.projDemand}
+                onToggle={() => toggleLine('projDemand')}
+              />
+              <LegendItem
+                color="#3FB950"
+                label="Fcst Supply"
+                value={null}
+                tooltip={forecastTarget === 'today' ? "Today's forecasted supply (day-ahead)" : "Tomorrow's projected supply forecast"}
+                isDotted
+                isVisible={visibleLines.projSupply}
+                onToggle={() => toggleLine('projSupply')}
+              />
+              <LegendItem
+                color="#D29922"
+                label="Fcst Price"
+                value={null}
+                tooltip={forecastTarget === 'today' ? "Today's forecasted price (day-ahead)" : "Tomorrow's projected average price"}
+                isDotted
+                isPrice
+                isVisible={visibleLines.projPrice}
+                onToggle={() => toggleLine('projPrice')}
+              />
+            </>
           )}
         </div>
       </div>
 
-      {error ? (
-        <div className={styles.placeholder} style={{ color: '#F85149' }}>
-          Error: {error}
-        </div>
-      ) : loading && chartData.length === 0 ? (
-        <div className={styles.placeholder}>Loading market data...</div>
-      ) : !hasData ? (
-        <div className={styles.placeholder}>No data available for selected time range</div>
-      ) : (
-        <ResponsiveContainer width="100%" height={240}>
+      {/* Chart area - flex to fill remaining space */}
+      <div style={{ flex: 1, minHeight: 0 }}>
+        {error ? (
+          <div className={styles.placeholder} style={{ color: '#F85149' }}>
+            Error: {error}
+          </div>
+        ) : loading && chartData.length === 0 ? (
+          <div className={styles.placeholder}>Loading market data...</div>
+        ) : !hasData ? (
+          <div className={styles.placeholder}>No data available for selected time range</div>
+        ) : (
+          <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={chartData} margin={{ top: 10, right: 60, left: 10, bottom: 0 }}>
             <defs>
               <linearGradient id="demandGradient" x1="0" y1="0" x2="0" y2="1">
@@ -370,13 +679,29 @@ export default function MarketChart() {
             <XAxis
               dataKey="timestamp"
               type="number"
-              domain={['dataMin', 'dataMax']}
+              domain={[chartBounds.startTime, chartBounds.endTime]}
               scale="time"
-              tickFormatter={formatTimeLabel}
+              ticks={xAxisTicks}
+              tickFormatter={(ts) => {
+                if (timeRange === '1H') {
+                  // Show HH:MM for 1H view
+                  return new Date(ts).toLocaleString('en-US', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: false,
+                    timeZone: 'America/Toronto'
+                  });
+                } else {
+                  // Show just hour for Today view (0-24)
+                  const hour = new Date(ts).getHours();
+                  // Handle midnight edge case: hour 0 at end = 24
+                  const displayHour = (ts === chartBounds.endTime && hour === 0) ? 24 : hour;
+                  return displayHour.toString();
+                }
+              }}
               stroke="#8B949E"
               style={{ fontSize: '9px' }}
               tickLine={false}
-              tickCount={tickCount}
             />
             <YAxis
               yAxisId="left"
@@ -413,7 +738,7 @@ export default function MarketChart() {
                 offset: 10,
               }}
             />
-            <Tooltip content={<CustomTooltip />} />
+            <RechartsTooltip content={<CustomTooltip />} />
 
             {/* Zero line for price (negative prices are possible) */}
             <ReferenceLine
@@ -423,8 +748,8 @@ export default function MarketChart() {
               strokeDasharray="3 3"
             />
 
-            {/* Supply area (background) - only if data exists */}
-            {hasSupply && (
+            {/* Supply area (background) - only if data exists and visible */}
+            {hasSupply && visibleLines.supply && (
               <Area
                 yAxisId="left"
                 type="stepAfter"
@@ -438,8 +763,8 @@ export default function MarketChart() {
               />
             )}
 
-            {/* Grid Load line - only if data exists */}
-            {hasGridLoad && (
+            {/* Grid Load line - only if data exists and visible */}
+            {hasGridLoad && visibleLines.gridLoad && (
               <Area
                 yAxisId="left"
                 type="monotone"
@@ -453,34 +778,83 @@ export default function MarketChart() {
               />
             )}
 
-            {/* Demand line with area fill */}
-            <Area
-              yAxisId="left"
-              type="monotone"
-              dataKey="demand_mw"
-              stroke="#39D5FF"
-              fill="url(#demandGradient)"
-              strokeWidth={2}
-              name="Demand"
-              connectNulls
-              isAnimationActive={false}
-            />
+            {/* Demand line with area fill - if visible */}
+            {visibleLines.demand && (
+              <Area
+                yAxisId="left"
+                type="monotone"
+                dataKey="demand_mw"
+                stroke="#39D5FF"
+                fill="url(#demandGradient)"
+                strokeWidth={2}
+                name="Demand"
+                connectNulls
+                isAnimationActive={false}
+              />
+            )}
 
-            {/* Price line */}
-            <Line
-              yAxisId="right"
-              type="monotone"
-              dataKey="price"
-              stroke="#D29922"
-              strokeWidth={1.5}
-              dot={false}
-              name="Price"
-              connectNulls
-              isAnimationActive={false}
-            />
+            {/* Price line - if visible */}
+            {visibleLines.price && (
+              <Line
+                yAxisId="right"
+                type="monotone"
+                dataKey="price"
+                stroke="#D29922"
+                strokeWidth={1.5}
+                dot={false}
+                name="Price"
+                connectNulls
+                isAnimationActive={false}
+              />
+            )}
+
+            {/* Day-Ahead overlay lines (dotted) - conditional on toggle and visibility */}
+            {showDayAhead && hasDaData && visibleLines.projDemand && (
+              <Line
+                yAxisId="left"
+                type="monotone"
+                dataKey="da_demand_mw"
+                stroke="#39D5FF"
+                strokeWidth={1.5}
+                strokeDasharray="5 5"
+                dot={false}
+                name={forecastTarget === 'today' ? "Forecast Demand" : "Tomorrow Demand"}
+                connectNulls
+                isAnimationActive={false}
+              />
+            )}
+            {showDayAhead && hasDaData && visibleLines.projSupply && (
+              <Line
+                yAxisId="left"
+                type="stepAfter"
+                dataKey="da_supply_mw"
+                stroke="#3FB950"
+                strokeWidth={1.5}
+                strokeDasharray="5 5"
+                dot={false}
+                name={forecastTarget === 'today' ? "Forecast Supply" : "Tomorrow Supply"}
+                connectNulls
+                isAnimationActive={false}
+              />
+            )}
+            {showDayAhead && hasDaData && visibleLines.projPrice && (
+              <Line
+                yAxisId="right"
+                type="monotone"
+                dataKey="da_price"
+                stroke="#D29922"
+                strokeWidth={1.5}
+                strokeDasharray="5 5"
+                dot={false}
+                name={forecastTarget === 'today' ? "Forecast Price" : "Tomorrow Price"}
+                connectNulls
+                isAnimationActive={false}
+              />
+            )}
           </ComposedChart>
         </ResponsiveContainer>
-      )}
+        )}
+      </div>
     </Card>
   );
 }

@@ -83,3 +83,36 @@ export interface ZoneData {
   demand_mw: number;
   last_updated: string;
 }
+
+// Day-Ahead Types
+export interface DayAheadDataPoint {
+  timestamp: string;
+  da_demand_mw: number | null;
+  da_supply_mw: number | null;
+  da_price: number | null;
+}
+
+export interface DayAheadResponse {
+  data: DayAheadDataPoint[];
+  today: string;
+  tomorrow: string;
+  timestamp: string;
+}
+
+// Peak Demand Types
+export interface PeakForecast {
+  peakMw: number;
+  peakHour: number;
+}
+
+export interface PeakDemandResponse {
+  today: PeakForecast;
+  tomorrow: PeakForecast | null;
+}
+
+// Intertie Price Types
+export interface IntertiePriceData {
+  intertie_zone: string;
+  lmp: number;
+  timestamp: string;
+}

@@ -6,6 +6,9 @@ Runs on a 5-minute schedule to match IESO data refresh rate.
 
 On startup, automatically backfills any missing data from IESO hourly archives.
 This handles gaps from laptop sleep, restarts, or other interruptions.
+
+Note: Generator output (GenOutputCapability) is NOT backfilled because IESO
+does not provide hourly archives for this report - it's a rolling snapshot only.
 """
 
 import asyncio
@@ -22,6 +25,9 @@ from parsers.realtime_totals import fetch_realtime_totals
 from parsers.generator_output import fetch_generator_output
 from parsers.fuel_mix import fetch_fuel_mix
 from parsers.intertie_flow import fetch_intertie_flow
+from parsers.adequacy import fetch_adequacy
+from parsers.da_ozp import fetch_da_ozp
+from utils.timezone import now_eastern
 
 # Configure logging
 logging.basicConfig(
@@ -197,28 +203,40 @@ async def backfill_on_startup(producer: KafkaProducerClient) -> None:
     """
     Backfill missing data from IESO hourly archives on startup.
 
-    Fetches all available hourly archives for today to fill any gaps
-    from when the producer wasn't running (e.g., laptop sleep).
-    Backfills demand, supply, AND prices.
-    """
-    logger.info("Checking for data gaps and backfilling if needed...")
+    Fetches hourly archives for YESTERDAY and TODAY to fill gaps from
+    overnight laptop sleep. IESO keeps ~7 days of hourly archives.
 
-    # Get today's date in compact format
-    now = datetime.now()
+    Backfills demand, supply, and prices. Generator output is NOT backfilled
+    because IESO does not provide hourly archives for GenOutputCapability -
+    it's a rolling snapshot document only. Generator data will be fresh
+    from the 5-minute polling cycle.
+    """
+    logger.info("Checking for data gaps and backfilling...")
+
+    # Use Eastern timezone (IESO's timezone) to get correct dates
+    now = now_eastern()
     today = now.strftime("%Y%m%d")
-    current_hour = now.hour + 1  # IESO uses 1-24, so add 1
+    yesterday = (now - timedelta(days=1)).strftime("%Y%m%d")
+    current_hour = now.hour + 1  # IESO uses 1-24
 
     all_demand: list[dict] = []
     all_supply: list[dict] = []
     all_prices: list[dict] = []
 
     async with httpx.AsyncClient(timeout=30) as client:
-        # Fetch all available hours for today (1 to current hour)
-        # Run in parallel for speed
-        hours = list(range(1, min(current_hour + 1, 25)))
+        # Build list of (date, hour) tuples to fetch
+        # Yesterday: all 24 hours
+        # Today: hours 1 to current hour
+        fetch_list: list[tuple[str, int]] = []
+        for hour in range(1, 25):
+            fetch_list.append((yesterday, hour))
+        for hour in range(1, min(current_hour + 1, 25)):
+            fetch_list.append((today, hour))
 
-        # Fetch demand/supply archives
-        demand_tasks = [fetch_hourly_archive(client, today, hour) for hour in hours]
+        logger.info(f"Backfilling {len(fetch_list)} hours (yesterday + today)...")
+
+        # Fetch demand/supply archives in parallel
+        demand_tasks = [fetch_hourly_archive(client, date, hour) for date, hour in fetch_list]
         demand_results = await asyncio.gather(*demand_tasks, return_exceptions=True)
 
         for result in demand_results:
@@ -228,8 +246,8 @@ async def backfill_on_startup(producer: KafkaProducerClient) -> None:
             all_demand.extend(demand)
             all_supply.extend(supply)
 
-        # Fetch price archives
-        price_tasks = [fetch_price_archive(client, today, hour) for hour in hours]
+        # Fetch price archives in parallel
+        price_tasks = [fetch_price_archive(client, date, hour) for date, hour in fetch_list]
         price_results = await asyncio.gather(*price_tasks, return_exceptions=True)
 
         for result in price_results:
@@ -311,7 +329,33 @@ async def fetch_all_reports(producer: KafkaProducerClient) -> None:
             logger.info(f"Published {len(intertie_flow)} intertie flow records")
         else:
             logger.error(f"Failed to fetch intertie flow: {intertie_flow}")
-        
+
+        # Fetch adequacy (tomorrow's demand forecast from dated Adequacy3 report)
+        try:
+            adequacy = await fetch_adequacy()
+            if adequacy:
+                dates_fetched = set(r['delivery_date'] for r in adequacy)
+                logger.info(f"Adequacy data fetched for dates: {dates_fetched}")
+                await producer.publish_batch("ieso.hourly.adequacy", adequacy)
+                logger.info(f"Published {len(adequacy)} adequacy (demand forecast) records")
+            else:
+                logger.warning("No adequacy data returned - report may not be published yet")
+        except Exception as e:
+            logger.error(f"Failed to fetch adequacy: {e}")
+
+        # Fetch day-ahead zonal prices (published daily around 13:30 ET)
+        try:
+            da_ozp = await fetch_da_ozp()
+            if da_ozp:
+                dates_fetched = set(r['delivery_date'] for r in da_ozp)
+                logger.info(f"DA OZP data fetched for dates: {dates_fetched}")
+                await producer.publish_batch("ieso.hourly.da-ozp", da_ozp)
+                logger.info(f"Published {len(da_ozp)} day-ahead zonal price records")
+            else:
+                logger.warning("No DA OZP data returned - report may not be published yet")
+        except Exception as e:
+            logger.error(f"Failed to fetch DA OZP: {e}")
+
         elapsed = (datetime.now() - start_time).total_seconds()
         logger.info(f"Fetch cycle completed in {elapsed:.2f}s")
         
