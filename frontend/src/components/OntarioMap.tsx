@@ -8,17 +8,25 @@ import { GENERATION_SITES, FUEL_COLORS } from '@/data/generation-sites';
 import { TRANSMISSION_IMAGE_URL, TRANSMISSION_BOUNDS, INTERTIES } from '@/data/transmission-lines';
 import type { ZoneData } from '@/lib/types';
 import Tooltip from './Tooltip';
+import union from '@turf/union';
+import { featureCollection } from '@turf/helpers';
+import type { Feature, Polygon, MultiPolygon } from 'geojson';
 
-// Price-to-color mapping for zone coloring
-const priceToColor = (price: number): string => {
-  if (price < 0) return '#3FB950';      // Negative (green) - surplus
-  if (price < 30) return '#238636';     // Low (dark green)
-  if (price < 50) return '#58A6FF';     // Normal (blue)
-  if (price < 100) return '#1F6FEB';    // Moderate (darker blue)
-  if (price < 150) return '#D29922';    // Elevated (yellow)
-  if (price < 200) return '#DB6D28';    // High (orange)
-  if (price < 300) return '#F85149';    // Very high (red)
-  return '#DA3633';                     // Critical (dark red)
+// Price-to-color mapping for zone coloring (IESO-aligned 12-tier scale)
+const priceToColor = (price: number | null | undefined): string => {
+  if (price === null || price === undefined) return '#888888'; // Undefined
+  if (price < -2000) return '#1E5AA8';  // < -$2,000 (dark blue)
+  if (price < -100) return '#4A90D9';   // < -$100 (blue)
+  if (price < -16) return '#7FE5E5';    // < -$16 (cyan)
+  if (price < -4) return '#D4F5D4';     // < -$4 (light green)
+  if (price < 0) return '#FFF8D6';      // < $0 (pale yellow)
+  if (price < 10) return '#FCE88C';     // < $10 (light yellow)
+  if (price < 30) return '#F8D14F';     // < $30 (yellow)
+  if (price < 60) return '#F5A623';     // < $60 (light orange)
+  if (price < 100) return '#E07830';    // < $100 (orange)
+  if (price < 400) return '#C83C23';    // < $400 (red)
+  if (price < 1200) return '#8B2913';   // < $1,200 (darker red)
+  return '#5C1A0B';                     // >= $1,200 (dark brown)
 };
 
 const priceToOpacity = (price: number): number => {
@@ -55,10 +63,12 @@ function MapContent({
 }) {
   const mapRef = useRef<L.Map | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const ontarioBorderRef = useRef<L.GeoJSON | null>(null);
   const pricingLayerRef = useRef<L.GeoJSON | null>(null);
   const generationLayerRef = useRef<L.LayerGroup | null>(null);
   const transmissionLayerRef = useRef<L.LayerGroup | null>(null);
   const animationFrameRef = useRef<number | null>(null);
+  const [mapReady, setMapReady] = useState(false);
 
   useEffect(() => {
     if (typeof window === 'undefined' || !containerRef.current) return;
@@ -99,6 +109,9 @@ function MapContent({
       // Compute Ontario bounds from GeoJSON for initial view (without adding the layer)
       const boundsLayer = L.geoJSON(ontarioZones as GeoJSON.FeatureCollection);
       map.fitBounds(boundsLayer.getBounds(), { padding: [10, 10] });
+
+      // Signal that map is ready for layers
+      setMapReady(true);
     };
 
     initMap();
@@ -113,9 +126,60 @@ function MapContent({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Add always-visible glowing Ontario border (outer boundary only)
+  useEffect(() => {
+    if (!mapReady || !mapRef.current) return;
+    const map = mapRef.current;
+
+    // Remove existing border layer if any
+    if (ontarioBorderRef.current) {
+      map.removeLayer(ontarioBorderRef.current);
+      ontarioBorderRef.current = null;
+    }
+
+    const loadBorderLayer = async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const L = (await import('leaflet')) as any;
+
+      // Merge all zone polygons into a single polygon using turf union
+      const zones = ontarioZones as GeoJSON.FeatureCollection<Polygon | MultiPolygon>;
+      let merged: Feature<Polygon | MultiPolygon> | null = null;
+
+      for (const feature of zones.features) {
+        if (!merged) {
+          merged = feature as Feature<Polygon | MultiPolygon>;
+        } else {
+          const result: Feature<Polygon | MultiPolygon> | null = union(featureCollection([merged, feature as Feature<Polygon | MultiPolygon>]));
+          if (result) merged = result;
+        }
+      }
+
+      if (!merged) return;
+
+      // Create layer with just the merged outer boundary
+      const borderLayer = L.geoJSON(merged, {
+        style: () => ({
+          fillColor: 'transparent',
+          fillOpacity: 0,
+          color: '#FFFFFF',
+          weight: 1.5,
+          opacity: 0.85,
+          className: 'ontario-glow-border',
+        }),
+        interactive: false,
+      });
+
+      borderLayer.addTo(map);
+      borderLayer.bringToBack();
+      ontarioBorderRef.current = borderLayer;
+    };
+
+    loadBorderLayer();
+  }, [mapReady]);
+
   // Manage pricing zones layer
   useEffect(() => {
-    if (!mapRef.current) return;
+    if (!mapReady || !mapRef.current) return;
     const map = mapRef.current;
 
     // Remove existing layer
@@ -197,11 +261,11 @@ function MapContent({
     };
 
     loadLayer();
-  }, [showPricing, zonePrices, selectedZone, onZoneSelect]);
+  }, [mapReady, showPricing, zonePrices, selectedZone, onZoneSelect]);
 
   // Manage generation site markers layer
   useEffect(() => {
-    if (!mapRef.current) return;
+    if (!mapReady || !mapRef.current) return;
     const map = mapRef.current;
 
     // Remove existing layer
@@ -241,11 +305,11 @@ function MapContent({
     };
 
     loadLayer();
-  }, [showGeneration]);
+  }, [mapReady, showGeneration]);
 
   // Manage transmission overlay layer with animated intertie flow arrows
   useEffect(() => {
-    if (!mapRef.current) return;
+    if (!mapReady || !mapRef.current) return;
     const map = mapRef.current;
 
     // Cancel any running animation
@@ -430,7 +494,7 @@ function MapContent({
         animationFrameRef.current = null;
       }
     };
-  }, [showTransmission]);
+  }, [mapReady, showTransmission]);
 
   return (
     <div
@@ -444,9 +508,9 @@ export default function OntarioMap({ onZoneSelect, selectedZone }: Props) {
   const [zonePrices, setZonePrices] = useState<ZonePriceMap>({});
   const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
-  const [showGeneration, setShowGeneration] = useState(false);
-  const [showTransmission, setShowTransmission] = useState(false);
-  const [showPricing, setShowPricing] = useState(false);
+  const [showGeneration, setShowGeneration] = useState(true);
+  const [showTransmission, setShowTransmission] = useState(true);
+  const [showPricing, setShowPricing] = useState(true);
 
   // Fetch zone prices
   const fetchZonePrices = useCallback(async () => {
@@ -508,14 +572,18 @@ export default function OntarioMap({ onZoneSelect, selectedZone }: Props) {
               <span style={{ color: '#8B949E' }}>$:</span>
               <div style={{ display: 'flex', gap: '2px' }}>
                 {([
-                  { color: '#3FB950', label: '< $0', desc: 'Surplus' },
-                  { color: '#238636', label: '$0–30', desc: 'Low' },
-                  { color: '#58A6FF', label: '$30–50', desc: 'Normal' },
-                  { color: '#1F6FEB', label: '$50–100', desc: 'Moderate' },
-                  { color: '#D29922', label: '$100–150', desc: 'Elevated' },
-                  { color: '#DB6D28', label: '$150–200', desc: 'High' },
-                  { color: '#F85149', label: '$200–300', desc: 'Very High' },
-                  { color: '#DA3633', label: '> $300', desc: 'Critical' },
+                  { color: '#1E5AA8', label: '< -$2000', desc: 'Deep Negative' },
+                  { color: '#4A90D9', label: '-$2000 to -$100', desc: 'Negative' },
+                  { color: '#7FE5E5', label: '-$100 to -$16', desc: 'Low Negative' },
+                  { color: '#D4F5D4', label: '-$16 to -$4', desc: 'Near Zero (-)' },
+                  { color: '#FFF8D6', label: '-$4 to $0', desc: 'Near Zero' },
+                  { color: '#FCE88C', label: '$0 to $10', desc: 'Low' },
+                  { color: '#F8D14F', label: '$10 to $30', desc: 'Normal' },
+                  { color: '#F5A623', label: '$30 to $60', desc: 'Moderate' },
+                  { color: '#E07830', label: '$60 to $100', desc: 'Elevated' },
+                  { color: '#C83C23', label: '$100 to $400', desc: 'High' },
+                  { color: '#8B2913', label: '$400 to $1200', desc: 'Very High' },
+                  { color: '#5C1A0B', label: '> $1200', desc: 'Critical' },
                 ] as const).map((tier) => (
                   <Tooltip
                     key={tier.color}
@@ -631,6 +699,11 @@ export default function OntarioMap({ onZoneSelect, selectedZone }: Props) {
         }
         .leaflet-control-attribution a {
           color: #58A6FF !important;
+        }
+        /* Subtle glowing white border for Ontario boundary - always visible */
+        .ontario-glow-border {
+          filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.6))
+                  drop-shadow(0 0 4px rgba(255, 255, 255, 0.3));
         }
         /* Glow effect for selected zone */
         .zone-selected {
