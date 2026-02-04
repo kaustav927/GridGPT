@@ -237,3 +237,50 @@ SELECT * FROM ieso.da_ozp_queue;
 
 -- Views will be created later via queries
 -- Base tables and Kafka consumers are ready
+
+-- ============================================================
+-- WEATHER DATA WITH FORECAST (15-minute data from Open-Meteo)
+-- ============================================================
+
+-- Kafka consumer table for weather with forecast support
+CREATE TABLE IF NOT EXISTS ieso.weather_queue (
+    fetch_timestamp DateTime,     -- When we fetched this data
+    valid_timestamp DateTime,     -- When this data is valid for
+    zone String,
+    lat Float32,
+    lng Float32,
+    temperature Float32,          -- Celsius
+    wind_speed Float32,           -- m/s
+    wind_direction UInt16,        -- degrees (0-360)
+    cloud_cover UInt8,            -- percentage (0-100)
+    precipitation Float32,        -- mm/h
+    is_forecast UInt8             -- 0 = observed, 1 = forecast
+) ENGINE = Kafka
+SETTINGS
+    kafka_broker_list = 'redpanda:9092',
+    kafka_topic_list = 'ieso.weather.forecast',
+    kafka_group_name = 'clickhouse-weather-forecast',
+    kafka_format = 'JSONEachRow',
+    kafka_num_consumers = 1;
+
+-- Persistent storage with forecast-aware schema
+CREATE TABLE IF NOT EXISTS ieso.weather (
+    fetch_timestamp DateTime,
+    valid_timestamp DateTime,
+    zone String,
+    lat Float32,
+    lng Float32,
+    temperature Float32,
+    wind_speed Float32,
+    wind_direction UInt16,
+    cloud_cover UInt8,
+    precipitation Float32,
+    is_forecast UInt8
+) ENGINE = MergeTree()
+PARTITION BY toYYYYMM(valid_timestamp)
+ORDER BY (zone, valid_timestamp, fetch_timestamp)
+TTL fetch_timestamp + INTERVAL 7 DAY;
+
+-- Auto-insert from Kafka
+CREATE MATERIALIZED VIEW IF NOT EXISTS ieso.weather_mv TO ieso.weather
+AS SELECT * FROM ieso.weather_queue;

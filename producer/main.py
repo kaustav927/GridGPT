@@ -27,6 +27,8 @@ from parsers.fuel_mix import fetch_fuel_mix
 from parsers.intertie_flow import fetch_intertie_flow
 from parsers.adequacy import fetch_adequacy
 from parsers.da_ozp import fetch_da_ozp
+from parsers.da_hourly_zonal import fetch_da_hourly_zonal
+from parsers.weather_forecast import fetch_weather_with_forecast
 from utils.timezone import now_eastern
 
 # Configure logging
@@ -344,23 +346,54 @@ async def fetch_all_reports(producer: KafkaProducerClient) -> None:
             logger.error(f"Failed to fetch adequacy: {e}")
 
         # Fetch day-ahead zonal prices (published daily around 13:30 ET)
+        # Two sources: province-wide (ONTARIO) and per-zone (EAST, WEST, etc.)
         try:
             da_ozp = await fetch_da_ozp()
             if da_ozp:
                 dates_fetched = set(r['delivery_date'] for r in da_ozp)
-                logger.info(f"DA OZP data fetched for dates: {dates_fetched}")
+                logger.info(f"DA OZP (province-wide) data fetched for dates: {dates_fetched}")
                 await producer.publish_batch("ieso.hourly.da-ozp", da_ozp)
-                logger.info(f"Published {len(da_ozp)} day-ahead zonal price records")
+                logger.info(f"Published {len(da_ozp)} province-wide day-ahead price records")
             else:
                 logger.warning("No DA OZP data returned - report may not be published yet")
         except Exception as e:
             logger.error(f"Failed to fetch DA OZP: {e}")
+
+        # Fetch per-zone day-ahead prices (same topic, different zones)
+        try:
+            da_zonal = await fetch_da_hourly_zonal()
+            if da_zonal:
+                zones_fetched = set(r['zone'] for r in da_zonal)
+                dates_fetched = set(r['delivery_date'] for r in da_zonal)
+                logger.info(f"DA Hourly Zonal data fetched for zones: {zones_fetched}, dates: {dates_fetched}")
+                await producer.publish_batch("ieso.hourly.da-ozp", da_zonal)
+                logger.info(f"Published {len(da_zonal)} per-zone day-ahead price records")
+            else:
+                logger.warning("No DA Hourly Zonal data returned - report may not be published yet")
+        except Exception as e:
+            logger.error(f"Failed to fetch DA Hourly Zonal: {e}")
 
         elapsed = (datetime.now() - start_time).total_seconds()
         logger.info(f"Fetch cycle completed in {elapsed:.2f}s")
         
     except Exception as e:
         logger.exception(f"Error in fetch cycle: {e}")
+
+
+async def fetch_weather_loop(producer: KafkaProducerClient) -> None:
+    """Fetch weather with forecast on a 15-minute schedule."""
+    weather_interval = 900  # 15 minutes in seconds
+
+    while True:
+        try:
+            weather = await fetch_weather_with_forecast()
+            if weather:
+                await producer.publish_batch("ieso.weather.forecast", weather)
+                logger.info(f"Published {len(weather)} weather forecast records")
+        except Exception as e:
+            logger.error(f"Weather fetch error: {e}")
+
+        await asyncio.sleep(weather_interval)
 
 
 async def run_scheduler() -> None:
@@ -380,13 +413,23 @@ async def run_scheduler() -> None:
     except Exception as e:
         logger.warning(f"Backfill failed (continuing anyway): {e}")
 
-    # Main polling loop
-    while True:
-        await fetch_all_reports(producer)
+    # Start weather fetch loop (15-minute interval, runs in background)
+    weather_task = asyncio.create_task(fetch_weather_loop(producer))
 
-        # Wait for next interval
-        logger.info(f"Sleeping for {settings.poll_interval}s...")
-        await asyncio.sleep(settings.poll_interval)
+    # Main polling loop (5-minute interval for IESO data)
+    try:
+        while True:
+            await fetch_all_reports(producer)
+
+            # Wait for next interval
+            logger.info(f"Sleeping for {settings.poll_interval}s...")
+            await asyncio.sleep(settings.poll_interval)
+    finally:
+        weather_task.cancel()
+        try:
+            await weather_task
+        except asyncio.CancelledError:
+            pass
 
 
 def main() -> None:

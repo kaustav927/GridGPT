@@ -6,11 +6,9 @@ import styles from './Card.module.css';
 import ontarioZones from '@/data/ontario-zones.geojson';
 import { GENERATION_SITES, FUEL_COLORS } from '@/data/generation-sites';
 import { TRANSMISSION_IMAGE_URL, TRANSMISSION_BOUNDS, INTERTIES } from '@/data/transmission-lines';
-import type { ZoneData } from '@/lib/types';
+import type { ZoneData, WeatherDataMap, WeatherData } from '@/lib/types';
 import Tooltip from './Tooltip';
-import union from '@turf/union';
-import { featureCollection } from '@turf/helpers';
-import type { Feature, Polygon, MultiPolygon } from 'geojson';
+import TimeScrubber from './TimeScrubber';
 
 // Price-to-color mapping for zone coloring (IESO-aligned 12-tier scale)
 const priceToColor = (price: number | null | undefined): string => {
@@ -36,6 +34,28 @@ const priceToOpacity = (price: number): number => {
   return baseOpacity + normalizedPrice * (maxOpacity - baseOpacity);
 };
 
+// Temperature to color (cold blue → hot red)
+const tempToColor = (celsius: number): string => {
+  if (celsius < -20) return '#1E5AA8';  // Deep cold (dark blue)
+  if (celsius < -10) return '#4A90D9';  // Very cold (blue)
+  if (celsius < 0) return '#7FE5E5';    // Cold (cyan)
+  if (celsius < 10) return '#A8E6CF';   // Cool (light green)
+  if (celsius < 20) return '#FCE88C';   // Mild (yellow)
+  if (celsius < 30) return '#F5A623';   // Warm (orange)
+  return '#C83C23';                     // Hot (red)
+};
+
+// Snap time to nearest 3-hour boundary for GDPS WMS model
+// GDPS model only has data at 00, 03, 06, 09, 12, 15, 18, 21 UTC
+const snapToGdpsTime = (date: Date | null): string | undefined => {
+  if (!date) return undefined;
+  const d = new Date(date);
+  const hours = d.getUTCHours();
+  const snappedHour = Math.round(hours / 3) * 3;
+  d.setUTCHours(snappedHour, 0, 0, 0);
+  return d.toISOString().split('.')[0] + 'Z';
+};
+
 interface ZonePriceMap {
   [zone: string]: ZoneData;
 }
@@ -53,6 +73,11 @@ function MapContent({
   showGeneration,
   showTransmission,
   showPricing,
+  showTemp,
+  showCloud,
+  showPrecip,
+  weatherData,
+  scrubTime,
 }: {
   zonePrices: ZonePriceMap;
   selectedZone?: string | null;
@@ -60,13 +85,24 @@ function MapContent({
   showGeneration: boolean;
   showTransmission: boolean;
   showPricing: boolean;
+  showTemp: boolean;
+  showCloud: boolean;
+  showPrecip: boolean;
+  weatherData: WeatherDataMap;
+  scrubTime: Date | null;
 }) {
   const mapRef = useRef<L.Map | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const ontarioBorderRef = useRef<L.GeoJSON | null>(null);
   const pricingLayerRef = useRef<L.GeoJSON | null>(null);
   const generationLayerRef = useRef<L.LayerGroup | null>(null);
   const transmissionLayerRef = useRef<L.LayerGroup | null>(null);
+  const tempLayerRef = useRef<L.GeoJSON | null>(null);
+  const cloudLayerRef = useRef<L.GeoJSON | null>(null);
+  const precipLayerRef = useRef<L.TileLayer | null>(null);
+  const tempWmsLayerRef = useRef<L.TileLayer | null>(null);
+  const cloudWmsLayerRef = useRef<L.TileLayer | null>(null);
+  // Track current WMS time to avoid unnecessary updates
+  const currentWmsTimeRef = useRef<string | undefined>(undefined);
   const animationFrameRef = useRef<number | null>(null);
   const [mapReady, setMapReady] = useState(false);
 
@@ -125,57 +161,6 @@ function MapContent({
     // We only want to initialize the map once, not on every prop change
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // Add always-visible glowing Ontario border (outer boundary only)
-  useEffect(() => {
-    if (!mapReady || !mapRef.current) return;
-    const map = mapRef.current;
-
-    // Remove existing border layer if any
-    if (ontarioBorderRef.current) {
-      map.removeLayer(ontarioBorderRef.current);
-      ontarioBorderRef.current = null;
-    }
-
-    const loadBorderLayer = async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const L = (await import('leaflet')) as any;
-
-      // Merge all zone polygons into a single polygon using turf union
-      const zones = ontarioZones as GeoJSON.FeatureCollection<Polygon | MultiPolygon>;
-      let merged: Feature<Polygon | MultiPolygon> | null = null;
-
-      for (const feature of zones.features) {
-        if (!merged) {
-          merged = feature as Feature<Polygon | MultiPolygon>;
-        } else {
-          const result: Feature<Polygon | MultiPolygon> | null = union(featureCollection([merged, feature as Feature<Polygon | MultiPolygon>]));
-          if (result) merged = result;
-        }
-      }
-
-      if (!merged) return;
-
-      // Create layer with just the merged outer boundary
-      const borderLayer = L.geoJSON(merged, {
-        style: () => ({
-          fillColor: 'transparent',
-          fillOpacity: 0,
-          color: '#FFFFFF',
-          weight: 1.5,
-          opacity: 0.85,
-          className: 'ontario-glow-border',
-        }),
-        interactive: false,
-      });
-
-      borderLayer.addTo(map);
-      borderLayer.bringToBack();
-      ontarioBorderRef.current = borderLayer;
-    };
-
-    loadBorderLayer();
-  }, [mapReady]);
 
   // Manage pricing zones layer
   useEffect(() => {
@@ -256,7 +241,7 @@ function MapContent({
       });
 
       geojsonLayer.addTo(map);
-      geojsonLayer.bringToBack();
+      // Don't use bringToBack - let it stay above weather WMS layers
       pricingLayerRef.current = geojsonLayer;
     };
 
@@ -496,6 +481,288 @@ function MapContent({
     };
   }, [mapReady, showTransmission]);
 
+  // Manage temperature overlay layer - using ECCC WMS for proper heatmap
+  // Split into two effects: one for layer creation/removal, one for time updates
+  useEffect(() => {
+    if (!mapReady || !mapRef.current) return;
+    const map = mapRef.current;
+
+    if (!showTemp) {
+      // Remove layers when disabled
+      if (tempWmsLayerRef.current) {
+        map.removeLayer(tempWmsLayerRef.current);
+        tempWmsLayerRef.current = null;
+      }
+      if (tempLayerRef.current) {
+        map.removeLayer(tempLayerRef.current);
+        tempLayerRef.current = null;
+      }
+      return;
+    }
+
+    // Create WMS layer if it doesn't exist
+    const initLayer = async () => {
+      if (tempWmsLayerRef.current) return; // Already exists
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const L = (await import('leaflet')) as any;
+
+      const timeStr = snapToGdpsTime(scrubTime);
+      const wmsOptions: Record<string, unknown> = {
+        layers: 'GDPS.ETA_TT',
+        format: 'image/png',
+        transparent: true,
+        opacity: 0.5,
+        attribution: '&copy; <a href="https://weather.gc.ca/">ECCC</a>',
+      };
+      if (timeStr) {
+        wmsOptions.time = timeStr;
+      }
+      const tempLayer = L.tileLayer.wms('https://geo.weather.gc.ca/geomet', wmsOptions);
+      tempLayer.addTo(map);
+      tempLayer.setZIndex(100);
+      tempWmsLayerRef.current = tempLayer;
+    };
+
+    initLayer();
+  }, [mapReady, showTemp]);
+
+  // Update temperature WMS time parameter without recreating layer
+  useEffect(() => {
+    if (!showTemp || !tempWmsLayerRef.current) return;
+
+    const timeStr = snapToGdpsTime(scrubTime);
+    if (timeStr !== currentWmsTimeRef.current) {
+      currentWmsTimeRef.current = timeStr;
+      // Update WMS params in-place - this loads new tiles without flashing
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (tempWmsLayerRef.current as any).setParams({ time: timeStr });
+    }
+  }, [showTemp, scrubTime]);
+
+  // Manage temperature zone markers (separate from WMS to avoid flashing)
+  useEffect(() => {
+    if (!mapReady || !mapRef.current) return;
+    const map = mapRef.current;
+
+    // Remove old markers
+    if (tempLayerRef.current) {
+      map.removeLayer(tempLayerRef.current);
+      tempLayerRef.current = null;
+    }
+
+    if (!showTemp || Object.keys(weatherData).length === 0) return;
+
+    const loadMarkers = async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const L = (await import('leaflet')) as any;
+
+      const markers: L.Marker[] = [];
+      Object.entries(weatherData).forEach(([zone, data]) => {
+        const feature = (ontarioZones as GeoJSON.FeatureCollection).features
+          .find(f => f.properties?.zone === zone);
+        if (!feature) return;
+
+        const bounds = L.geoJSON(feature).getBounds();
+        const center = bounds.getCenter();
+
+        const icon = L.divIcon({
+          html: `
+            <div style="
+              font-family: 'JetBrains Mono', monospace;
+              font-size: 11px;
+              font-weight: 600;
+              color: ${tempToColor(data.temperature)};
+              background: rgba(13, 17, 23, 0.85);
+              padding: 2px 5px;
+              border: 1px solid #30363D;
+              text-shadow: 0 0 4px rgba(0,0,0,0.8);
+              white-space: nowrap;
+            ">${data.temperature.toFixed(0)}°</div>
+          `,
+          className: '',
+          iconSize: [40, 20],
+          iconAnchor: [20, 10],
+        });
+
+        const marker = L.marker([center.lat, center.lng], { icon, interactive: false });
+        markers.push(marker);
+      });
+
+      const markerGroup = L.layerGroup(markers);
+      markerGroup.addTo(map);
+      tempLayerRef.current = markerGroup;
+    };
+
+    loadMarkers();
+  }, [mapReady, showTemp, weatherData]);
+
+  // Manage cloud cover overlay layer - using ECCC WMS for cloud coverage
+  // Split into effects for layer creation and time updates
+  useEffect(() => {
+    if (!mapReady || !mapRef.current) return;
+    const map = mapRef.current;
+
+    if (!showCloud) {
+      if (cloudWmsLayerRef.current) {
+        map.removeLayer(cloudWmsLayerRef.current);
+        cloudWmsLayerRef.current = null;
+      }
+      if (cloudLayerRef.current) {
+        map.removeLayer(cloudLayerRef.current);
+        cloudLayerRef.current = null;
+      }
+      return;
+    }
+
+    const initLayer = async () => {
+      if (cloudWmsLayerRef.current) return;
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const L = (await import('leaflet')) as any;
+
+      const timeStr = snapToGdpsTime(scrubTime);
+      const wmsOptions: Record<string, unknown> = {
+        layers: 'GDPS.ETA_NT',
+        format: 'image/png',
+        transparent: true,
+        opacity: 0.5,
+        attribution: '&copy; <a href="https://weather.gc.ca/">ECCC</a>',
+      };
+      if (timeStr) {
+        wmsOptions.time = timeStr;
+      }
+      const cloudLayer = L.tileLayer.wms('https://geo.weather.gc.ca/geomet', wmsOptions);
+      cloudLayer.addTo(map);
+      cloudLayer.setZIndex(90);
+      cloudWmsLayerRef.current = cloudLayer;
+    };
+
+    initLayer();
+  }, [mapReady, showCloud]);
+
+  // Update cloud WMS time parameter without recreating layer
+  useEffect(() => {
+    if (!showCloud || !cloudWmsLayerRef.current) return;
+
+    const timeStr = snapToGdpsTime(scrubTime);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (cloudWmsLayerRef.current as any).setParams({ time: timeStr });
+  }, [showCloud, scrubTime]);
+
+  // Manage cloud zone markers
+  useEffect(() => {
+    if (!mapReady || !mapRef.current) return;
+    const map = mapRef.current;
+
+    if (cloudLayerRef.current) {
+      map.removeLayer(cloudLayerRef.current);
+      cloudLayerRef.current = null;
+    }
+
+    if (!showCloud || Object.keys(weatherData).length === 0) return;
+
+    const loadMarkers = async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const L = (await import('leaflet')) as any;
+
+      const markers: L.Marker[] = [];
+      Object.entries(weatherData).forEach(([zone, data]) => {
+        const feature = (ontarioZones as GeoJSON.FeatureCollection).features
+          .find(f => f.properties?.zone === zone);
+        if (!feature) return;
+
+        const bounds = L.geoJSON(feature).getBounds();
+        const center = bounds.getCenter();
+
+        const cloudIcon = data.cloud_cover > 75 ? '☁️' :
+                          data.cloud_cover > 50 ? '⛅' :
+                          data.cloud_cover > 25 ? '🌤️' : '☀️';
+
+        const icon = L.divIcon({
+          html: `
+            <div style="
+              font-family: 'JetBrains Mono', monospace;
+              font-size: 14px;
+              text-align: center;
+              filter: drop-shadow(0 0 2px rgba(0,0,0,0.8));
+            ">${cloudIcon}</div>
+          `,
+          className: '',
+          iconSize: [24, 24],
+          iconAnchor: [12, 12],
+        });
+
+        const marker = L.marker([center.lat, center.lng], {
+          icon,
+          interactive: true,
+        }).bindTooltip(`
+          <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 8px; background: #161B22; border: 1px solid #30363D;">
+            <div style="font-weight: 600; color: #E6EDF3; margin-bottom: 4px;">${zone}</div>
+            <div style="color: #8B949E;">${data.cloud_cover}% cloud cover</div>
+          </div>
+        `, { direction: 'auto', className: 'zone-tooltip' });
+
+        markers.push(marker);
+      });
+
+      const markerGroup = L.layerGroup(markers);
+      markerGroup.addTo(map);
+      cloudLayerRef.current = markerGroup;
+    };
+
+    loadMarkers();
+  }, [mapReady, showCloud, weatherData]);
+
+  // Manage precipitation forecast WMS layer from Environment Canada
+  // Split into effects for layer creation and time updates
+  useEffect(() => {
+    if (!mapReady || !mapRef.current) return;
+    const map = mapRef.current;
+
+    if (!showPrecip) {
+      if (precipLayerRef.current) {
+        map.removeLayer(precipLayerRef.current);
+        precipLayerRef.current = null;
+      }
+      return;
+    }
+
+    const initLayer = async () => {
+      if (precipLayerRef.current) return;
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const L = (await import('leaflet')) as any;
+
+      const timeStr = snapToGdpsTime(scrubTime);
+      const wmsOptions: Record<string, unknown> = {
+        layers: 'GDPS.ETA_PR',
+        format: 'image/png',
+        transparent: true,
+        opacity: 0.6,
+        attribution: '&copy; <a href="https://weather.gc.ca/">ECCC</a>',
+      };
+      if (timeStr) {
+        wmsOptions.time = timeStr;
+      }
+      const precipLayer = L.tileLayer.wms('https://geo.weather.gc.ca/geomet', wmsOptions);
+      precipLayer.addTo(map);
+      precipLayer.setZIndex(95);
+      precipLayerRef.current = precipLayer;
+    };
+
+    initLayer();
+  }, [mapReady, showPrecip]);
+
+  // Update precipitation WMS time parameter without recreating layer
+  useEffect(() => {
+    if (!showPrecip || !precipLayerRef.current) return;
+
+    const timeStr = snapToGdpsTime(scrubTime);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (precipLayerRef.current as any).setParams({ time: timeStr });
+  }, [showPrecip, scrubTime]);
+
   return (
     <div
       ref={containerRef}
@@ -506,16 +773,27 @@ function MapContent({
 
 export default function OntarioMap({ onZoneSelect, selectedZone }: Props) {
   const [zonePrices, setZonePrices] = useState<ZonePriceMap>({});
+  const [weatherData, setWeatherData] = useState<WeatherDataMap>({});
   const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
   const [showGeneration, setShowGeneration] = useState(true);
   const [showTransmission, setShowTransmission] = useState(true);
   const [showPricing, setShowPricing] = useState(true);
+  const [showTemp, setShowTemp] = useState(false);
+  const [showCloud, setShowCloud] = useState(false);
+  const [showPrecip, setShowPrecip] = useState(false);
+  const [showScrubber, setShowScrubber] = useState(false);
+  const [scrubTime, setScrubTime] = useState<Date>(new Date());
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [priceSource, setPriceSource] = useState<'realtime' | 'day_ahead' | 'unavailable'>('realtime');
 
-  // Fetch zone prices
-  const fetchZonePrices = useCallback(async () => {
+  // Fetch zone prices (current or at specific time)
+  const fetchZonePrices = useCallback(async (atTime?: Date) => {
     try {
-      const pricesRes = await fetch('/api/prices');
+      const url = atTime
+        ? `/api/prices/at-time?timestamp=${atTime.toISOString()}`
+        : '/api/prices';
+      const pricesRes = await fetch(url);
 
       if (!pricesRes.ok) {
         throw new Error('Failed to fetch zone data');
@@ -523,15 +801,26 @@ export default function OntarioMap({ onZoneSelect, selectedZone }: Props) {
 
       const pricesData = await pricesRes.json();
 
+      // Track the source for time scrubber display
+      if (pricesData.source === 'day_ahead') {
+        setPriceSource('day_ahead');
+      } else if (pricesData.source === 'realtime') {
+        setPriceSource('realtime');
+      } else if (pricesData.data?.length === 0 && atTime && atTime > new Date()) {
+        setPriceSource('unavailable');
+      } else {
+        setPriceSource('realtime');
+      }
+
       // Create lookup map
       const priceMap: ZonePriceMap = {};
 
-      pricesData.data.forEach((p: { zone: string; price: number; last_updated: string }) => {
+      pricesData.data.forEach((p: { zone: string; price: number; last_updated?: string }) => {
         priceMap[p.zone] = {
           zone: p.zone,
           price: p.price,
           demand_mw: 0,
-          last_updated: p.last_updated,
+          last_updated: p.last_updated || new Date().toISOString(),
         };
       });
 
@@ -543,12 +832,61 @@ export default function OntarioMap({ onZoneSelect, selectedZone }: Props) {
     }
   }, []);
 
+  // Fetch weather data (current or at specific time)
+  const fetchWeatherData = useCallback(async (atTime?: Date) => {
+    try {
+      const url = atTime
+        ? `/api/weather/at-time?timestamp=${atTime.toISOString()}`
+        : '/api/weather';
+      const res = await fetch(url);
+      if (res.ok) {
+        const json = await res.json();
+        const map: WeatherDataMap = {};
+        for (const row of json.data as WeatherData[]) {
+          map[row.zone] = row;
+        }
+        setWeatherData(map);
+      }
+    } catch (err) {
+      console.error('Weather fetch error:', err);
+    }
+  }, []);
+
+  // Fetch data at scrubbed time when scrubber is active
+  useEffect(() => {
+    if (!showScrubber) return;
+
+    // Reduced debounce for faster scrubbing response (WMS layers update immediately)
+    const timeout = setTimeout(() => {
+      fetchZonePrices(scrubTime);
+      fetchWeatherData(scrubTime);
+    }, 50);
+
+    return () => clearTimeout(timeout);
+  }, [showScrubber, scrubTime, fetchZonePrices, fetchWeatherData]);
+
+  // Initial fetch and regular polling (only when not scrubbing)
   useEffect(() => {
     setMounted(true);
     fetchZonePrices();
-    const interval = setInterval(fetchZonePrices, 30000);
-    return () => clearInterval(interval);
-  }, [fetchZonePrices]);
+    fetchWeatherData();
+
+    // Only poll when not showing scrubber
+    if (showScrubber) return;
+
+    const priceInterval = setInterval(() => fetchZonePrices(), 30000);
+    const weatherInterval = setInterval(() => fetchWeatherData(), 60000);
+    return () => {
+      clearInterval(priceInterval);
+      clearInterval(weatherInterval);
+    };
+  }, [fetchZonePrices, fetchWeatherData, showScrubber]);
+
+  // Handle live button click
+  const handleLiveClick = useCallback(() => {
+    setScrubTime(new Date());
+    setIsPlaying(false);
+  }, []);
 
   // Calculate province-wide average
   const avgPrice = useMemo(() => {
@@ -612,13 +950,61 @@ export default function OntarioMap({ onZoneSelect, selectedZone }: Props) {
               </div>
             </div>
           )}
+          {showTemp && (
+            <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+              <span style={{ color: '#8B949E' }}>°C:</span>
+              <div style={{ display: 'flex', gap: '2px' }}>
+                {([
+                  { color: '#1E5AA8', label: '< -20°C' },
+                  { color: '#4A90D9', label: '-20 to -10°C' },
+                  { color: '#7FE5E5', label: '-10 to 0°C' },
+                  { color: '#A8E6CF', label: '0 to 10°C' },
+                  { color: '#FCE88C', label: '10 to 20°C' },
+                  { color: '#F5A623', label: '20 to 30°C' },
+                  { color: '#C83C23', label: '> 30°C' },
+                ] as const).map((tier) => (
+                  <Tooltip key={tier.color} content={tier.label}>
+                    <div style={{ width: 10, height: 10, background: tier.color, cursor: 'default' }} />
+                  </Tooltip>
+                ))}
+              </div>
+            </div>
+          )}
+          {showPrecip && (
+            <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+              <span style={{ color: '#8B949E' }}>mm:</span>
+              <div style={{ display: 'flex', gap: '2px' }}>
+                {([
+                  { color: '#E8F4E8', label: '0 mm', desc: 'None' },
+                  { color: '#A8D5BA', label: '< 1 mm', desc: 'Trace' },
+                  { color: '#7EC8E3', label: '1-2 mm', desc: 'Light' },
+                  { color: '#4A90D9', label: '2-5 mm', desc: 'Moderate' },
+                  { color: '#1E5AA8', label: '5-10 mm', desc: 'Heavy' },
+                  { color: '#7B68EE', label: '10-25 mm', desc: 'Very Heavy' },
+                  { color: '#9932CC', label: '> 25 mm', desc: 'Extreme' },
+                ] as const).map((tier) => (
+                  <Tooltip
+                    key={tier.color}
+                    content={
+                      <div>
+                        <div style={{ fontWeight: 600, marginBottom: 2 }}>{tier.desc}</div>
+                        <div style={{ color: tier.color }}>{tier.label}</div>
+                      </div>
+                    }
+                  >
+                    <div style={{ width: 10, height: 10, background: tier.color, cursor: 'default' }} />
+                  </Tooltip>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
       {!mounted || loading ? (
         <div className={styles.placeholder}>Loading map...</div>
       ) : (
-        <div style={{ flex: 1, minHeight: 0, width: '100%' }}>
+        <div style={{ flex: 1, minHeight: 0, width: '100%', position: 'relative' }}>
           <MapContent
             zonePrices={zonePrices}
             selectedZone={selectedZone}
@@ -626,7 +1012,23 @@ export default function OntarioMap({ onZoneSelect, selectedZone }: Props) {
             showGeneration={showGeneration}
             showTransmission={showTransmission}
             showPricing={showPricing}
+            showTemp={showTemp}
+            showCloud={showCloud}
+            showPrecip={showPrecip}
+            weatherData={weatherData}
+            scrubTime={showScrubber ? scrubTime : null}
           />
+          {showScrubber && (
+            <TimeScrubber
+              currentTime={scrubTime}
+              onTimeChange={setScrubTime}
+              isPlaying={isPlaying}
+              onPlayPause={() => setIsPlaying((v) => !v)}
+              onLiveClick={handleLiveClick}
+              priceSource={priceSource}
+              showWeatherOverlay={showTemp || showCloud || showPrecip}
+            />
+          )}
         </div>
       )}
 
@@ -652,17 +1054,39 @@ export default function OntarioMap({ onZoneSelect, selectedZone }: Props) {
           <Icon icon="route" size={12} />
           <span>Transmission</span>
         </button>
-        <button className={styles.weatherBtn}>
+        <button
+          className={showTemp ? styles.weatherBtnActive : styles.weatherBtn}
+          onClick={() => setShowTemp((v) => !v)}
+        >
           <Icon icon="temperature" size={12} />
           <span>Temp</span>
         </button>
-        <button className={styles.weatherBtn}>
-          <Icon icon="wind" size={12} />
-          <span>Wind</span>
-        </button>
-        <button className={styles.weatherBtn}>
+        <button
+          className={showCloud ? styles.weatherBtnActive : styles.weatherBtn}
+          onClick={() => setShowCloud((v) => !v)}
+        >
           <Icon icon="cloud" size={12} />
+          <span>Cloud</span>
+        </button>
+        <button
+          className={showPrecip ? styles.weatherBtnActive : styles.weatherBtn}
+          onClick={() => setShowPrecip((v) => !v)}
+        >
+          <Icon icon="tint" size={12} />
           <span>Precip</span>
+        </button>
+        <button
+          className={showScrubber ? styles.weatherBtnActive : styles.weatherBtn}
+          onClick={() => {
+            setShowScrubber((v) => !v);
+            if (!showScrubber) {
+              setScrubTime(new Date());
+              setIsPlaying(false);
+            }
+          }}
+        >
+          <Icon icon="time" size={12} />
+          <span>Time</span>
         </button>
       </div>
 
@@ -699,11 +1123,6 @@ export default function OntarioMap({ onZoneSelect, selectedZone }: Props) {
         }
         .leaflet-control-attribution a {
           color: #58A6FF !important;
-        }
-        /* Subtle glowing white border for Ontario boundary - always visible */
-        .ontario-glow-border {
-          filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.6))
-                  drop-shadow(0 0 4px rgba(255, 255, 255, 0.3));
         }
         /* Glow effect for selected zone */
         .zone-selected {

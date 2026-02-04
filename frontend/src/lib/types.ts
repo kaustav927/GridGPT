@@ -116,3 +116,18 @@ export interface IntertiePriceData {
   lmp: number;
   timestamp: string;
 }
+
+// Weather Data Types
+export interface WeatherData {
+  zone: string;
+  temperature: number;
+  wind_speed: number;
+  wind_direction: number;
+  cloud_cover: number;
+  precipitation?: number;
+  last_updated: string;
+}
+
+export interface WeatherDataMap {
+  [zone: string]: WeatherData;
+}

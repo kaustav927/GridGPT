@@ -115,6 +115,7 @@ services:
       rpk topic create ieso.hourly.da-ozp --brokers redpanda:9092 -p 1 -r 1 || true
       rpk topic create ieso.hourly.da-intertie-lmp --brokers redpanda:9092 -p 1 -r 1 || true
       rpk topic create ieso.realtime.intertie-lmp --brokers redpanda:9092 -p 1 -r 1 || true
+      rpk topic create ieso.weather.forecast --brokers redpanda:9092 -p 1 -r 1 || true
       echo "Topics created successfully"
       rpk topic list --brokers redpanda:9092
       '
