@@ -167,6 +167,25 @@
   font-size: 9px;
 }
 
+.timeLabel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  min-width: 50px;
+}
+
+.timeDate {
+  color: #8B949E;
+  font-size: 8px;
+  text-transform: uppercase;
+}
+
+.timeTime {
+  color: #8B949E;
+  font-size: 9px;
+}
+
 .current {
   display: flex;
   flex-direction: column;

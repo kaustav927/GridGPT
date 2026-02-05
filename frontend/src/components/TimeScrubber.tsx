@@ -77,17 +77,18 @@ export default function TimeScrubber({
   }, [minTime, maxTime]);
 
   // Animation effect when playing
+  // Speed: 100ms interval, +15 min per tick = ~19s for full 48h loop
   useEffect(() => {
     if (!isPlaying) return;
 
     const interval = setInterval(() => {
-      const newTime = new Date(currentTime.getTime() + 15 * 60 * 1000);
+      const newTime = new Date(currentTime.getTime() + 15 * 60 * 1000); // +15 min per tick
       if (newTime > maxTime) {
         onTimeChange(minTime);
       } else {
         onTimeChange(newTime);
       }
-    }, 1000);
+    }, 100); // 100ms interval = 10fps, smooth and fast (~19s for 48h)
 
     return () => clearInterval(interval);
   }, [isPlaying, currentTime, minTime, maxTime, onTimeChange]);
@@ -106,6 +107,14 @@ export default function TimeScrubber({
     return date.toLocaleString('en-CA', {
       hour: '2-digit',
       minute: '2-digit',
+      timeZone: 'America/Toronto',
+    });
+  };
+
+  const formatDateLabel = (date: Date) => {
+    return date.toLocaleString('en-CA', {
+      month: 'short',
+      day: 'numeric',
       timeZone: 'America/Toronto',
     });
   };
@@ -138,7 +147,10 @@ export default function TimeScrubber({
           <Icon icon={isPlaying ? 'pause' : 'play'} size={12} />
         </button>
 
-        <span className={styles.time}>{formatShortTime(minTime)}</span>
+        <span className={styles.timeLabel}>
+          <span className={styles.timeDate}>{formatDateLabel(minTime)}</span>
+          <span className={styles.timeTime}>{formatShortTime(minTime)}</span>
+        </span>
 
         <div className={styles.track}>
           {/* Weather data availability zones (show when any weather overlay is active) */}
@@ -198,7 +210,10 @@ export default function TimeScrubber({
           />
         </div>
 
-        <span className={styles.time}>{formatShortTime(maxTime)}</span>
+        <span className={styles.timeLabel}>
+          <span className={styles.timeDate}>{formatDateLabel(maxTime)}</span>
+          <span className={styles.timeTime}>{formatShortTime(maxTime)}</span>
+        </span>
 
         <div className={styles.current}>
           <span className={getStatusClass()}>

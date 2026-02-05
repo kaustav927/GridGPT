@@ -21,6 +21,7 @@ export async function GET(request: Request) {
 
     // If future time, use day-ahead prices from da_ozp table
     if (requestedTime > now) {
+      // delivery_hour matches the hour directly (no +1 offset needed)
       const data = await query<PriceAtTime>(`
         SELECT
           zone,
@@ -28,7 +29,7 @@ export async function GET(request: Request) {
           1 as is_forecast
         FROM ieso.da_ozp
         WHERE delivery_date = toDate(parseDateTimeBestEffort('${sanitizedTs}'))
-          AND delivery_hour = toHour(parseDateTimeBestEffort('${sanitizedTs}')) + 1
+          AND delivery_hour = toHour(parseDateTimeBestEffort('${sanitizedTs}'))
         GROUP BY zone
         ORDER BY zone
       `);
@@ -41,17 +42,18 @@ export async function GET(request: Request) {
       });
     }
 
-    // Historical: use actual realtime prices
+    // Historical: find nearest timestamp per zone within ±2 hour window
+    // Uses LIMIT 1 BY zone with ORDER BY distance for reliable nearest-neighbor lookup
     const data = await query<PriceAtTime>(`
       SELECT
         zone,
-        argMax(price, timestamp) as price,
+        price,
         0 as is_forecast
       FROM ieso.zonal_prices
-      WHERE timestamp >= parseDateTimeBestEffort('${sanitizedTs}') - INTERVAL 5 MINUTE
+      WHERE timestamp >= parseDateTimeBestEffort('${sanitizedTs}') - INTERVAL 2 HOUR
         AND timestamp <= parseDateTimeBestEffort('${sanitizedTs}') + INTERVAL 5 MINUTE
-      GROUP BY zone
-      ORDER BY zone
+      ORDER BY zone, abs(toInt64(timestamp) - toInt64(parseDateTimeBestEffort('${sanitizedTs}')))
+      LIMIT 1 BY zone
     `);
 
     return NextResponse.json({
