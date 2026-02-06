@@ -43,6 +43,8 @@ export async function GET(request: Request) {
       data,
       timestamp,
       count: data.length,
+    }, {
+      headers: { 'Cache-Control': 's-maxage=60, stale-while-revalidate=120' },
     });
   } catch (error) {
     console.error('ClickHouse error:', error);

@@ -28,8 +28,8 @@ export default function TimeScrubber({
     const nowTime = new Date();
     return {
       now: nowTime,
-      minTime: new Date(nowTime.getTime() - 24 * 60 * 60 * 1000), // -24h
-      maxTime: new Date(nowTime.getTime() + 24 * 60 * 60 * 1000), // +24h
+      minTime: new Date(nowTime.getTime() - 12 * 60 * 60 * 1000), // -12h
+      maxTime: new Date(nowTime.getTime() + 12 * 60 * 60 * 1000), // +12h
     };
   }, []);
 
@@ -57,27 +57,27 @@ export default function TimeScrubber({
   }, [currentTime, now]);
 
   // Calculate weather data availability zones (for track visualization)
-  // Weather data: past 24h (full) + future 3h (transition) + future 3h+ (GDPS only, sparse)
+  // Weather data: past 12h (full) + future 3h (transition) + future 3h+ (GDPS only, sparse)
   const weatherZones = useMemo(() => {
-    // Weather data available: past 24h to future ~3h (Open-Meteo + WMS snapping)
+    // Weather data available: past 12h to future ~3h (Open-Meteo + WMS snapping)
     // Future 3h+ has sparse GDPS forecast data (3-hour intervals)
-    const totalRange = maxTime.getTime() - minTime.getTime(); // 48h
+    // Total range is 24h (±12h from now)
 
-    // NOW is at 50% of the track (minTime = -24h, maxTime = +24h)
-    // Weather full data zone: 0% (past 24h) to ~56.25% (NOW + 3h)
-    // Weather sparse zone: 56.25% to 100%
-    const weatherFullEnd = 50 + (3 / 48) * 100; // NOW + 3h as percentage
+    // NOW is at 50% of the track (minTime = -12h, maxTime = +12h)
+    // Weather full data zone: 0% (past 12h) to ~62.5% (NOW + 3h)
+    // Weather sparse zone: 62.5% to 100%
+    const weatherFullEnd = 50 + (3 / 24) * 100; // NOW + 3h as percentage
 
     return {
       fullZoneStart: 0,
-      fullZoneEnd: weatherFullEnd, // ~56.25%
+      fullZoneEnd: weatherFullEnd, // ~62.5%
       sparseZoneStart: weatherFullEnd,
       sparseZoneEnd: 100,
     };
-  }, [minTime, maxTime]);
+  }, []);
 
   // Animation effect when playing
-  // Speed: 100ms interval, +15 min per tick = ~19s for full 48h loop
+  // Speed: 100ms interval, +15 min per tick = ~9.6s for full 24h loop
   useEffect(() => {
     if (!isPlaying) return;
 
@@ -88,7 +88,7 @@ export default function TimeScrubber({
       } else {
         onTimeChange(newTime);
       }
-    }, 100); // 100ms interval = 10fps, smooth and fast (~19s for 48h)
+    }, 100); // 100ms interval = 10fps, smooth and fast (~9.6s for 24h)
 
     return () => clearInterval(interval);
   }, [isPlaying, currentTime, minTime, maxTime, onTimeChange]);

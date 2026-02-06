@@ -10,8 +10,8 @@ import MarketChart from '@/components/MarketChart';
 import Interties from '@/components/Interties';
 
 export default function Dashboard() {
-  const [currentTime, setCurrentTime] = useState(new Date());
-  const [lastRefresh, setLastRefresh] = useState(new Date());
+  const [currentTime, setCurrentTime] = useState<Date | null>(null);
+  const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [selectedZone, setSelectedZone] = useState<string | null>(null);
 
   const handleZoneSelect = useCallback((zone: string | null) => {
@@ -19,6 +19,8 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
+    setCurrentTime(new Date());
+    setLastRefresh(new Date());
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
@@ -30,7 +32,8 @@ export default function Dashboard() {
     return () => clearInterval(refreshInterval);
   }, []);
 
-  const formatTime = (date: Date) => {
+  const formatTime = (date: Date | null) => {
+    if (!date) return '--:--';
     return date.toLocaleTimeString('en-US', {
       hour: '2-digit',
       minute: '2-digit',

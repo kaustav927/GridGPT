@@ -45,6 +45,21 @@ const tempToColor = (celsius: number): string => {
   return '#C83C23';                     // Hot (red)
 };
 
+// Snap time to nearest hour (intertie data is hourly granularity)
+const snapToHour = (date: Date | null): string | null => {
+  if (!date) return null;
+  const d = new Date(date);
+  d.setMinutes(0, 0, 0);
+  return d.toISOString();
+};
+
+// Compute bearing between two lat/lng points (degrees)
+const getBearing = (lat0: number, lng0: number, lat1: number, lng1: number): number => {
+  const dLng = lng1 - lng0;
+  const dLat = lat1 - lat0;
+  return Math.atan2(dLng, dLat) * (180 / Math.PI);
+};
+
 // Snap time to nearest 3-hour boundary for GDPS WMS model
 // GDPS model only has data at 00, 03, 06, 09, 12, 15, 18, 21 UTC
 const snapToGdpsTime = (date: Date | null): string | undefined => {
@@ -94,8 +109,17 @@ function MapContent({
   const mapRef = useRef<L.Map | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const pricingLayerRef = useRef<L.GeoJSON | null>(null);
+  const zonePricesRef = useRef<ZonePriceMap>(zonePrices);
+  const selectedZoneRef = useRef(selectedZone);
   const generationLayerRef = useRef<L.LayerGroup | null>(null);
-  const transmissionLayerRef = useRef<L.LayerGroup | null>(null);
+  // Transmission layer split: base (static) + chevrons (dynamic) + animation (independent)
+  const transmissionBaseLayerRef = useRef<L.LayerGroup | null>(null);
+  const transmissionChevronLayerRef = useRef<L.LayerGroup | null>(null);
+  const chevronMarkersRef = useRef<{ marker: L.Marker; from: [number, number]; to: [number, number]; offset: number }[]>([]);
+  const intertieFlowCacheRef = useRef<Map<string, { data: Record<string, { mw: number; lastUpdated: string }>; fetchedAt: number }>>(new Map());
+  const lastIntertieHourRef = useRef<string | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const polylineRefsRef = useRef<Map<string, any>>(new Map());
   const tempLayerRef = useRef<L.GeoJSON | null>(null);
   const cloudLayerRef = useRef<L.GeoJSON | null>(null);
   // WMS layers use double-buffering for smooth time transitions
@@ -168,7 +192,8 @@ function MapContent({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Manage pricing zones layer
+  // Pricing Effect A — Create GeoJSON layer once (no zonePrices in deps)
+  // Style function reads from zonePricesRef / selectedZoneRef (refs, not state)
   useEffect(() => {
     if (!mapReady || !mapRef.current) return;
     const map = mapRef.current;
@@ -197,9 +222,9 @@ function MapContent({
           }
 
           const zone = feature.properties.zone;
-          const zoneData = zonePrices[zone];
+          const zoneData = zonePricesRef.current[zone];
           const price = zoneData?.price || 0;
-          const isSelected = zone === selectedZone;
+          const isSelected = zone === selectedZoneRef.current;
 
           return {
             fillColor: priceToColor(price),
@@ -213,7 +238,7 @@ function MapContent({
           const zone = feature.properties?.zone;
           if (!zone) return;
 
-          const zoneData = zonePrices[zone];
+          const zoneData = zonePricesRef.current[zone];
 
           const tooltipContent = `
             <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 8px; background: #161B22; border: 1px solid #30363D;">
@@ -230,7 +255,7 @@ function MapContent({
 
           layer.on('click', () => {
             if (onZoneSelect) {
-              onZoneSelect(zone === selectedZone ? null : zone);
+              onZoneSelect(zone === selectedZoneRef.current ? null : zone);
             }
           });
 
@@ -247,12 +272,61 @@ function MapContent({
       });
 
       geojsonLayer.addTo(map);
-      // Don't use bringToBack - let it stay above weather WMS layers
       pricingLayerRef.current = geojsonLayer;
     };
 
     loadLayer();
-  }, [mapReady, showPricing, zonePrices, selectedZone, onZoneSelect]);
+  }, [mapReady, showPricing, onZoneSelect]);
+
+  // Pricing Effect B — Update styles in-place when prices or selection change
+  // No layer destruction, just re-runs style function and updates tooltips
+  useEffect(() => {
+    zonePricesRef.current = zonePrices;
+    selectedZoneRef.current = selectedZone;
+
+    if (!pricingLayerRef.current) return;
+
+    // Re-run style function on all features (reads from refs)
+    pricingLayerRef.current.setStyle((feature: GeoJSON.Feature | undefined) => {
+      if (!feature?.properties?.zone) {
+        return {
+          fillColor: '#30363D',
+          fillOpacity: 0.1,
+          color: '#30363D',
+          weight: 1,
+        };
+      }
+
+      const zone = feature.properties.zone;
+      const zoneData = zonePrices[zone];
+      const price = zoneData?.price || 0;
+      const isSelected = zone === selectedZone;
+
+      return {
+        fillColor: priceToColor(price),
+        fillOpacity: isSelected ? 0.5 : priceToOpacity(price),
+        color: isSelected ? '#58A6FF' : '#30363D',
+        weight: isSelected ? 2 : 1,
+        className: isSelected ? 'zone-selected' : '',
+      };
+    });
+
+    // Update tooltip content on each sublayer
+    pricingLayerRef.current.eachLayer((layer: L.Layer) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const feature = (layer as any).feature as GeoJSON.Feature | undefined;
+      const zone = feature?.properties?.zone;
+      if (!zone) return;
+
+      const zoneData = zonePrices[zone];
+      layer.setTooltipContent(`
+        <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 8px; background: #161B22; border: 1px solid #30363D;">
+          <div style="font-weight: 600; color: #E6EDF3; margin-bottom: 4px;">${feature?.properties?.name || zone}</div>
+          <div style="color: #D29922;">Price: $${zoneData?.price?.toFixed(2) || 'N/A'}/MWh</div>
+        </div>
+      `);
+    });
+  }, [zonePrices, selectedZone]);
 
   // Manage generation site markers layer
   useEffect(() => {
@@ -298,26 +372,28 @@ function MapContent({
     loadLayer();
   }, [mapReady, showGeneration]);
 
-  // Manage transmission overlay layer with animated intertie flow arrows
+  // Effect A — Transmission base layer (static: image overlay + polylines, created once)
+  // NO scrubTime dependency — never rebuilds during scrubbing
   useEffect(() => {
     if (!mapReady || !mapRef.current) return;
     const map = mapRef.current;
 
-    // Cancel any running animation
-    if (animationFrameRef.current !== null) {
-      cancelAnimationFrame(animationFrameRef.current);
-      animationFrameRef.current = null;
+    // Remove existing base layer + chevron layer
+    if (transmissionBaseLayerRef.current) {
+      map.removeLayer(transmissionBaseLayerRef.current);
+      transmissionBaseLayerRef.current = null;
     }
-
-    // Remove existing layer
-    if (transmissionLayerRef.current) {
-      map.removeLayer(transmissionLayerRef.current);
-      transmissionLayerRef.current = null;
+    if (transmissionChevronLayerRef.current) {
+      map.removeLayer(transmissionChevronLayerRef.current);
+      transmissionChevronLayerRef.current = null;
     }
+    chevronMarkersRef.current = [];
+    polylineRefsRef.current.clear();
+    lastIntertieHourRef.current = null;
 
     if (!showTransmission) return;
 
-    const loadLayer = async () => {
+    const loadBaseLayer = async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const L = (await import('leaflet')) as any;
 
@@ -330,154 +406,230 @@ function MapContent({
       });
       layers.push(imageOverlay);
 
-      // Fetch grouped intertie flow data from API
-      // API convention: positive = export from Ontario, negative = import to Ontario
-      const flowByGroup: Record<string, { mw: number; lastUpdated: string }> = {};
-      try {
-        const res = await fetch('/api/interties');
-        if (res.ok) {
-          const json = await res.json();
-          for (const row of json.data) {
-            flowByGroup[row.flow_group] = { mw: row.actual_mw, lastUpdated: row.last_updated };
-          }
-        }
-      } catch {
-        // Fallback: no flow data, static lines only
-      }
-
-      // Helper: compute bearing between two points
-      const getBearing = (lat0: number, lng0: number, lat1: number, lng1: number): number => {
-        const dLng = lng1 - lng0;
-        const dLat = lat1 - lat0;
-        return Math.atan2(dLng, dLat) * (180 / Math.PI);
-      };
-
-      // Chevron markers for animation
-      const chevronMarkers: { marker: L.Marker; from: [number, number]; to: [number, number]; offset: number }[] = [];
-
-      // Add intertie polylines with flow-aware styling
-      // API convention: positive = export from Ontario, negative = import to Ontario
+      // Add 8 intertie polylines with default "no data" styling
       INTERTIES.forEach((intertie) => {
+        const polyline = L.polyline(intertie.path, {
+          color: '#F0883E',
+          weight: 3,
+          opacity: 0.5,
+          dashArray: '8, 6',
+        }).bindTooltip(
+          `<div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 8px; background: #161B22; border: 1px solid #30363D;">
+            <div style="font-weight: 600; color: #E6EDF3; margin-bottom: 4px;">${intertie.name}</div>
+            <div style="color: #8B949E; font-weight: 600;">NO FLOW</div>
+          </div>`,
+          { direction: 'auto', className: 'zone-tooltip', sticky: true }
+        );
+        layers.push(polyline);
+        polylineRefsRef.current.set(intertie.flowKey + ':' + intertie.name, polyline);
+      });
+
+      const layerGroup = L.layerGroup(layers);
+      layerGroup.addTo(map);
+      transmissionBaseLayerRef.current = layerGroup;
+    };
+
+    loadBaseLayer();
+  }, [mapReady, showTransmission]);
+
+  // Rebuild chevron markers from flow data (called by Effect B after data fetch)
+  const rebuildChevrons = useCallback(async (
+    flowByGroup: Record<string, { mw: number; lastUpdated: string }>,
+    map: L.Map
+  ) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const L = (await import('leaflet')) as any;
+
+    // Remove ONLY the chevron layer, not the base layer
+    if (transmissionChevronLayerRef.current) {
+      map.removeLayer(transmissionChevronLayerRef.current);
+      transmissionChevronLayerRef.current = null;
+    }
+
+    const chevronLayers: L.Layer[] = [];
+    const newChevrons: typeof chevronMarkersRef.current = [];
+
+    INTERTIES.forEach((intertie) => {
+      const entry = flowByGroup[intertie.flowKey];
+      const mw = entry?.mw ?? 0;
+      const isExport = mw > 0;
+      const hasFlow = Math.abs(mw) > 1;
+
+      if (!hasFlow) return;
+
+      // path[0] = Ontario side, path[1] = external side
+      const from: [number, number] = isExport ? intertie.path[0] : intertie.path[1];
+      const to: [number, number] = isExport ? intertie.path[1] : intertie.path[0];
+      const bearing = getBearing(from[0], from[1], to[0], to[1]);
+      const chevronColor = isExport ? '#3FB950' : '#F85149';
+
+      // Create 3 staggered chevrons per line
+      for (let i = 0; i < 3; i++) {
+        const icon = L.divIcon({
+          html: `<span style="
+            font-size: 16px;
+            font-weight: bold;
+            color: ${chevronColor};
+            text-shadow: 0 0 4px ${chevronColor};
+            transform: rotate(${bearing - 90}deg);
+            display: inline-block;
+            pointer-events: none;
+            line-height: 1;
+          ">&rsaquo;&rsaquo;&rsaquo;</span>`,
+          className: '',
+          iconSize: [20, 20],
+          iconAnchor: [10, 10],
+        });
+
+        const marker = L.marker(from, {
+          icon,
+          interactive: false,
+          keyboard: false,
+        });
+        chevronLayers.push(marker);
+        newChevrons.push({ marker, from, to, offset: i / 3 });
+      }
+    });
+
+    if (chevronLayers.length > 0) {
+      const chevronGroup = L.layerGroup(chevronLayers);
+      chevronGroup.addTo(map);
+      transmissionChevronLayerRef.current = chevronGroup;
+    }
+
+    // Update shared ref — animation loop automatically picks up new markers
+    chevronMarkersRef.current = newChevrons;
+  }, []);
+
+  // Effect B — Flow data fetch (decoupled from rendering, snap-to-hour skip logic)
+  useEffect(() => {
+    if (!mapReady || !mapRef.current || !showTransmission) return;
+    const map = mapRef.current;
+
+    // Update polyline styles and tooltips in-place via setStyle() and setTooltipContent()
+    const updatePolylineStyles = (flowByGroup: Record<string, { mw: number; lastUpdated: string }>) => {
+      INTERTIES.forEach((intertie) => {
+        const polyline = polylineRefsRef.current.get(intertie.flowKey + ':' + intertie.name);
+        if (!polyline) return;
+
         const entry = flowByGroup[intertie.flowKey];
         const mw = entry?.mw ?? 0;
         const isExport = mw > 0;
         const hasFlow = Math.abs(mw) > 1;
 
-        const lineColor = hasFlow
-          ? (isExport ? '#3FB950' : '#F85149')
-          : '#F0883E';
-
-        const dirLabel = hasFlow
-          ? (isExport ? 'EXPORT' : 'IMPORT')
-          : 'NO FLOW';
-        const dirColor = hasFlow
-          ? (isExport ? '#3FB950' : '#F85149')
-          : '#8B949E';
+        const lineColor = hasFlow ? (isExport ? '#3FB950' : '#F85149') : '#F0883E';
+        const dirLabel = hasFlow ? (isExport ? 'EXPORT' : 'IMPORT') : 'NO FLOW';
+        const dirColor = hasFlow ? (isExport ? '#3FB950' : '#F85149') : '#8B949E';
 
         const asOf = entry?.lastUpdated
           ? new Date(entry.lastUpdated.replace(' ', 'T') + 'Z')
               .toLocaleString(undefined, { timeZone: 'America/Toronto', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
           : '';
 
-        const polyline = L.polyline(intertie.path, {
+        polyline.setStyle({
           color: lineColor,
-          weight: 3,
           opacity: hasFlow ? 0.9 : 0.5,
           dashArray: hasFlow ? undefined : '8, 6',
-        }).bindTooltip(
+        });
+
+        polyline.setTooltipContent(
           `<div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 8px; background: #161B22; border: 1px solid #30363D;">
             <div style="font-weight: 600; color: #E6EDF3; margin-bottom: 4px;">${intertie.name}</div>
             <div style="color: ${dirColor}; font-weight: 600;">${dirLabel} ${hasFlow ? Math.abs(mw).toFixed(0) + ' MW' : ''}</div>
             ${asOf ? `<div style="color: #8B949E; font-size: 10px; margin-top: 4px;">as of ${asOf}</div>` : ''}
-          </div>`,
-          { direction: 'auto', className: 'zone-tooltip', sticky: true }
+          </div>`
         );
-        layers.push(polyline);
+      });
+    };
 
-        // Create animated chevron markers for lines with flow
-        if (hasFlow) {
-          // path[0] = Ontario side, path[1] = external side
-          // Export (positive MW) = arrows from Ontario → external (path[0] → path[1])
-          // Import (negative MW) = arrows from external → Ontario (path[1] → path[0])
-          const from: [number, number] = isExport ? intertie.path[0] : intertie.path[1];
-          const to: [number, number] = isExport ? intertie.path[1] : intertie.path[0];
+    // Snap scrubTime to nearest hour — intertie data is hourly granularity
+    const snappedHour = snapToHour(scrubTime);
 
-          const bearing = getBearing(from[0], from[1], to[0], to[1]);
-          const chevronColor = isExport ? '#3FB950' : '#F85149';
+    // Skip fetch if hour hasn't changed
+    if (snappedHour === lastIntertieHourRef.current) return;
+    lastIntertieHourRef.current = snappedHour;
 
-          // Create 3 staggered chevrons per line
-          for (let i = 0; i < 3; i++) {
-            const icon = L.divIcon({
-              html: `<span style="
-                font-size: 16px;
-                font-weight: bold;
-                color: ${chevronColor};
-                text-shadow: 0 0 4px ${chevronColor};
-                transform: rotate(${bearing - 90}deg);
-                display: inline-block;
-                pointer-events: none;
-                line-height: 1;
-              ">&rsaquo;&rsaquo;&rsaquo;</span>`,
-              className: '',
-              iconSize: [20, 20],
-              iconAnchor: [10, 10],
-            });
+    // Check cache (60s TTL)
+    const cacheKey = snappedHour || 'current';
+    const cached = intertieFlowCacheRef.current.get(cacheKey);
+    if (cached && Date.now() - cached.fetchedAt < 60000) {
+      // Use cached data: update polyline styles in-place + rebuild chevrons
+      updatePolylineStyles(cached.data);
+      rebuildChevrons(cached.data, map);
+      return;
+    }
 
-            const marker = L.marker(from, {
-              icon,
-              interactive: false,
-              keyboard: false,
-            });
-            layers.push(marker);
-
-            chevronMarkers.push({
-              marker,
-              from,
-              to,
-              offset: i / 3, // stagger: 0, 0.33, 0.66
-            });
+    // Fetch fresh data
+    const fetchFlowData = async () => {
+      const flowByGroup: Record<string, { mw: number; lastUpdated: string }> = {};
+      try {
+        const url = scrubTime
+          ? `/api/interties/at-time?timestamp=${scrubTime.toISOString()}`
+          : '/api/interties';
+        const res = await fetch(url);
+        if (res.ok) {
+          const json = await res.json();
+          for (const row of json.data) {
+            flowByGroup[row.flow_group] = { mw: row.mw ?? row.actual_mw ?? 0, lastUpdated: row.last_updated };
           }
         }
-      });
+      } catch {
+        // Fallback: no flow data
+      }
 
-      const layerGroup = L.layerGroup(layers);
-      layerGroup.addTo(map);
-      transmissionLayerRef.current = layerGroup;
+      // Cache the result
+      intertieFlowCacheRef.current.set(cacheKey, { data: flowByGroup, fetchedAt: Date.now() });
 
-      // Animation loop
-      if (chevronMarkers.length > 0) {
-        const cycleDuration = 2000; // ms per full cycle
-        const startTime = performance.now();
+      // Update polyline styles in-place (no layer destruction)
+      updatePolylineStyles(flowByGroup);
 
-        const animate = (now: number) => {
-          const elapsed = now - startTime;
-
-          for (const chev of chevronMarkers) {
-            // Progress 0→1 over cycleDuration, offset by stagger
-            const rawT = ((elapsed / cycleDuration) + chev.offset) % 1;
-            const t = rawT;
-
-            // Interpolate position
-            const lat = chev.from[0] + t * (chev.to[0] - chev.from[0]);
-            const lng = chev.from[1] + t * (chev.to[1] - chev.from[1]);
-            chev.marker.setLatLng([lat, lng]);
-
-            // Fade: sin curve peaks at 0.5 progress
-            const opacity = Math.sin(t * Math.PI);
-            const el = chev.marker.getElement();
-            if (el) {
-              el.style.opacity = String(opacity);
-            }
-          }
-
-          animationFrameRef.current = requestAnimationFrame(animate);
-        };
-
-        animationFrameRef.current = requestAnimationFrame(animate);
+      // Rebuild only the chevron markers
+      if (mapRef.current) {
+        rebuildChevrons(flowByGroup, mapRef.current);
       }
     };
 
-    loadLayer();
+    fetchFlowData();
+  }, [mapReady, showTransmission, scrubTime, rebuildChevrons]);
+
+  // Effect C — Animation loop (independent, continuous while transmission is on)
+  // NO scrubTime dependency — runs continuously, reads from chevronMarkersRef each frame
+  useEffect(() => {
+    if (!mapReady || !showTransmission) {
+      if (animationFrameRef.current !== null) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+      return;
+    }
+
+    const cycleDuration = 2000; // ms per full cycle
+    const startTime = performance.now();
+
+    const animate = (now: number) => {
+      const elapsed = now - startTime;
+      const markers = chevronMarkersRef.current;
+
+      for (const chev of markers) {
+        const t = ((elapsed / cycleDuration) + chev.offset) % 1;
+
+        // Interpolate position
+        const lat = chev.from[0] + t * (chev.to[0] - chev.from[0]);
+        const lng = chev.from[1] + t * (chev.to[1] - chev.from[1]);
+        chev.marker.setLatLng([lat, lng]);
+
+        // Fade: sin curve peaks at 0.5 progress
+        const opacity = Math.sin(t * Math.PI);
+        const el = chev.marker.getElement();
+        if (el) {
+          el.style.opacity = String(opacity);
+        }
+      }
+
+      animationFrameRef.current = requestAnimationFrame(animate);
+    };
+
+    animationFrameRef.current = requestAnimationFrame(animate);
 
     return () => {
       if (animationFrameRef.current !== null) {
@@ -814,9 +966,14 @@ export default function OntarioMap({ onZoneSelect, selectedZone }: Props) {
   const [showCloud, setShowCloud] = useState(false);
   const [showPrecip, setShowPrecip] = useState(false);
   const [showScrubber, setShowScrubber] = useState(true);
-  const [scrubTime, setScrubTime] = useState<Date>(new Date());
+  const [scrubTime, setScrubTime] = useState<Date | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [priceSource, setPriceSource] = useState<'realtime' | 'day_ahead' | 'unavailable'>('realtime');
+
+  // Throttle refs for scrub-fetch (replaces broken debounce)
+  const lastFetchTimeRef = useRef<number>(0);
+  const trailingFetchRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const SCRUB_FETCH_INTERVAL = 500; // max 2 fetches/sec during play
 
   // Fetch zone prices (current or at specific time)
   const fetchZonePrices = useCallback(async (atTime?: Date) => {
@@ -883,22 +1040,48 @@ export default function OntarioMap({ onZoneSelect, selectedZone }: Props) {
     }
   }, []);
 
-  // Fetch data at scrubbed time when scrubber is active
+  // Fetch data at scrubbed time when scrubber is active (throttled, not debounced)
+  // Debounce is broken for play mode: 100ms ticks constantly reset the 300ms timer → 0 fetches.
+  // Throttle guarantees periodic firing (~2/sec) during play, and a trailing call on pause.
   useEffect(() => {
-    if (!showScrubber) return;
+    if (!showScrubber || !scrubTime) return;
 
-    // Reduced debounce for faster scrubbing response (WMS layers update immediately)
-    const timeout = setTimeout(() => {
+    const now = Date.now();
+    const elapsed = now - lastFetchTimeRef.current;
+
+    if (trailingFetchRef.current) {
+      clearTimeout(trailingFetchRef.current);
+      trailingFetchRef.current = null;
+    }
+
+    if (elapsed >= SCRUB_FETCH_INTERVAL) {
+      // Enough time passed — fire immediately
+      lastFetchTimeRef.current = now;
       fetchZonePrices(scrubTime);
       fetchWeatherData(scrubTime);
-    }, 50);
+    } else {
+      // Schedule trailing call for when interval expires
+      const remaining = SCRUB_FETCH_INTERVAL - elapsed;
+      trailingFetchRef.current = setTimeout(() => {
+        lastFetchTimeRef.current = Date.now();
+        fetchZonePrices(scrubTime);
+        fetchWeatherData(scrubTime);
+        trailingFetchRef.current = null;
+      }, remaining);
+    }
 
-    return () => clearTimeout(timeout);
+    return () => {
+      if (trailingFetchRef.current) {
+        clearTimeout(trailingFetchRef.current);
+        trailingFetchRef.current = null;
+      }
+    };
   }, [showScrubber, scrubTime, fetchZonePrices, fetchWeatherData]);
 
   // Initial fetch and regular polling (only when not scrubbing)
   useEffect(() => {
     setMounted(true);
+    setScrubTime(new Date());
     fetchZonePrices();
     fetchWeatherData();
 
@@ -1049,7 +1232,7 @@ export default function OntarioMap({ onZoneSelect, selectedZone }: Props) {
             weatherData={weatherData}
             scrubTime={showScrubber ? scrubTime : null}
           />
-          {showScrubber && (
+          {showScrubber && scrubTime && (
             <TimeScrubber
               currentTime={scrubTime}
               onTimeChange={setScrubTime}

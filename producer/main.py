@@ -205,8 +205,9 @@ async def backfill_on_startup(producer: KafkaProducerClient) -> None:
     """
     Backfill missing data from IESO hourly archives on startup.
 
-    Fetches hourly archives for YESTERDAY and TODAY to fill gaps from
-    overnight laptop sleep. IESO keeps ~7 days of hourly archives.
+    Fetches hourly archives for the last 3 DAYS (day before yesterday,
+    yesterday, and today) to fill gaps from laptop sleep, restarts, etc.
+    IESO keeps ~7 days of hourly archives.
 
     Backfills demand, supply, and prices. Generator output is NOT backfilled
     because IESO does not provide hourly archives for GenOutputCapability -
@@ -217,8 +218,6 @@ async def backfill_on_startup(producer: KafkaProducerClient) -> None:
 
     # Use Eastern timezone (IESO's timezone) to get correct dates
     now = now_eastern()
-    today = now.strftime("%Y%m%d")
-    yesterday = (now - timedelta(days=1)).strftime("%Y%m%d")
     current_hour = now.hour + 1  # IESO uses 1-24
 
     all_demand: list[dict] = []
@@ -227,15 +226,19 @@ async def backfill_on_startup(producer: KafkaProducerClient) -> None:
 
     async with httpx.AsyncClient(timeout=30) as client:
         # Build list of (date, hour) tuples to fetch
-        # Yesterday: all 24 hours
-        # Today: hours 1 to current hour
+        # Fetch last 3 days: day before yesterday, yesterday, today
         fetch_list: list[tuple[str, int]] = []
-        for hour in range(1, 25):
-            fetch_list.append((yesterday, hour))
-        for hour in range(1, min(current_hour + 1, 25)):
-            fetch_list.append((today, hour))
+        for days_ago in range(2, -1, -1):  # 2, 1, 0 = 3 days
+            target_date = now - timedelta(days=days_ago)
+            date_compact = target_date.strftime("%Y%m%d")
 
-        logger.info(f"Backfilling {len(fetch_list)} hours (yesterday + today)...")
+            # For today (days_ago=0), only fetch up to current hour
+            max_hour = 24 if days_ago > 0 else current_hour
+
+            for hour in range(1, max_hour + 1):
+                fetch_list.append((date_compact, hour))
+
+        logger.info(f"Backfilling {len(fetch_list)} hours (3 days)...")
 
         # Fetch demand/supply archives in parallel
         demand_tasks = [fetch_hourly_archive(client, date, hour) for date, hour in fetch_list]
