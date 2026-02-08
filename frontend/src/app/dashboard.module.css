@@ -3,11 +3,13 @@
   background: var(--bg-primary);
   color: var(--text-primary);
   font-family: 'JetBrains Mono', monospace;
-  overflow-x: clip; /* Prevent horizontal scroll but allow vertical tooltip overflow */
+  display: flex;
+  flex-direction: column;
 }
 
 .header {
   height: 48px;
+  flex-shrink: 0;
   background: var(--bg-primary);
   border-bottom: 1px solid var(--border-color);
   display: flex;
@@ -75,11 +77,12 @@
   grid-template-columns: minmax(280px, 420px) 1fr minmax(260px, 380px);
   gap: 12px;
   padding: 12px;
+  width: 100%;
   max-width: 1920px;
   margin: 0 auto;
-  overflow: visible; /* Allow tooltips to overflow grid bounds */
-  height: calc(100vh - 48px - 24px); /* viewport minus header(48px) minus vertical padding(12px*2) */
-  grid-template-rows: 1fr;
+  overflow: visible;
+  flex: 1;
+  min-height: calc(100vh - 48px - 40px - 24px);
 }
 
 .leftPanel,
@@ -89,11 +92,11 @@
   flex-direction: column;
   gap: 12px;
   min-width: 0;
-  overflow: visible; /* Allow tooltips to overflow panel bounds */
+  overflow: visible;
 }
 
 .rightPanel {
-  min-height: 0; /* Override auto minimum so grid track constrains height */
+  min-height: 0;
 }
 
 /* Large laptop breakpoint - use percentage caps to keep center dominant */
@@ -103,8 +106,7 @@
     grid-template-columns: minmax(260px, 23%) 1fr minmax(240px, 21%);
     gap: 10px;
     padding: 10px;
-    height: calc(100vh - 48px - 20px);
-    grid-template-rows: 1fr;
+    min-height: calc(100vh - 48px - 40px - 20px);
   }
 
   .leftPanel,
@@ -121,8 +123,7 @@
     grid-template-columns: minmax(240px, 22%) 1fr minmax(220px, 20%);
     gap: 8px;
     padding: 8px;
-    height: calc(100vh - 48px - 16px);
-    grid-template-rows: 1fr;
+    min-height: calc(100vh - 48px - 40px - 16px);
   }
 
   .leftPanel,
@@ -139,8 +140,7 @@
     grid-template-columns: minmax(220px, 21%) 1fr minmax(200px, 19%);
     gap: 6px;
     padding: 6px;
-    height: calc(100vh - 48px - 12px);
-    grid-template-rows: 1fr;
+    min-height: calc(100vh - 48px - 40px - 12px);
   }
 
   .leftPanel,
@@ -157,8 +157,7 @@
     grid-template-columns: minmax(200px, 20%) 1fr minmax(180px, 18%);
     gap: 5px;
     padding: 5px;
-    height: calc(100vh - 48px - 10px);
-    grid-template-rows: 1fr;
+    min-height: calc(100vh - 48px - 40px - 10px);
   }
 
   .leftPanel,
@@ -183,18 +182,41 @@
   overflow: hidden !important;
 }
 
+/* Desktop panel classes */
+.panelGridAI { flex: 1 1 0; min-height: 0; max-height: 45%; }
+.panelFuelMix {}
+.panelGenByResource {}
+.panelMap {}
+.panelMarketOverview {}
+.panelInterties {}
+
 /* Mobile/tablet - single column */
 @media (max-width: 900px) {
+  /* Compact header: hide timestamps */
+  .timestamp, .timestampValue { display: none; }
+  .statusSection { gap: 8px; }
+  .header { padding: 0 12px; }
+
+  /* Single column grid */
   .mainContent {
     grid-template-columns: 1fr;
-    gap: 12px;
-    padding: 12px;
-    height: auto; /* Single column layout scrolls naturally */
+    gap: 8px;
+    padding: 8px;
+    flex: none;
+    min-height: auto;
   }
 
-  .leftPanel,
-  .centerPanel,
-  .rightPanel {
-    gap: 12px;
-  }
+  /* Dissolve column wrappers */
+  .leftPanel, .centerPanel, .rightPanel { display: contents; }
+
+  /* Panel ordering + sizing */
+  .panelGridAI { order: 1; flex: none; max-height: none; height: 42vh; }
+  .panelMap { order: 2; height: calc(100vh - 48px - 42vh - 24px); }
+  .panelMarketOverview { order: 3; }
+  .panelFuelMix { order: 4; }
+  .panelInterties { order: 5; }
+  .panelGenByResource { order: 6; }
+
+  /* Override map aspect ratio for mobile */
+  .mapPanelBody { aspect-ratio: auto !important; }
 }

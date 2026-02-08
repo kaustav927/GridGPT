@@ -438,8 +438,8 @@ export default function FuelMix() {
         <thead>
           <tr>
             <th>Fuel</th>
-            <th style={{ textAlign: 'right' }}>Output</th>
-            <th style={{ textAlign: 'right' }} className={styles.capacityColumn}>
+            <th style={{ textAlign: 'center' }}>Output</th>
+            <th style={{ textAlign: 'center' }} className={styles.capacityColumn}>
               Capacity
             </th>
             <th>Utilization</th>
@@ -454,11 +454,11 @@ export default function FuelMix() {
                 <td>
                   <span style={{ color }}>{FUEL_LABELS[row.fuel_type] || row.fuel_type}</span>
                 </td>
-                <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                <td style={{ textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>
                   {Math.round(row.output_mw).toLocaleString()}
                 </td>
                 <td
-                  style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}
+                  style={{ textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}
                   className={styles.capacityColumn}
                 >
                   {row.capacity_mw ? Math.round(row.capacity_mw).toLocaleString() : '—'}

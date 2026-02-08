@@ -1,6 +1,6 @@
 .scrubberContainer {
   position: absolute;
-  bottom: 50px;
+  bottom: 0;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -282,30 +282,52 @@
 
 @media (max-width: 900px) {
   .scrubberContainer {
-    bottom: 40px;
+    bottom: 0; left: 0; right: 0;
+    transform: none; width: 100%;
   }
 
   .scrubber {
+    flex-wrap: wrap;
     gap: 6px;
-    padding: 6px 8px;
+    padding: 6px 10px;
     font-size: 9px;
+    justify-content: space-between;
   }
 
-  .track {
-    width: 160px;
-  }
+  /* Row 1: [start time] [---track---] [end time] */
+  .scrubber > :nth-child(2) { order: 1; }  /* timeLabel start */
+  .scrubber > :nth-child(3) { order: 2; }  /* track */
+  .scrubber > :nth-child(4) { order: 3; }  /* timeLabel end */
 
-  .time {
-    display: none;
-  }
+  /* Row 2: [play] [current time info] [LIVE] */
+  .scrubber > :nth-child(1) { order: 4; }  /* playBtn */
+  .scrubber > :nth-child(5) { order: 5; }  /* current */
+  .scrubber > :nth-child(6) { order: 6; }  /* liveBtn */
 
+  /* Track fills row 1, forces wrap */
+  .track { flex: 1 1 0; width: auto; min-width: 60%; }
+
+  /* Time labels: compact */
+  .timeLabel { min-width: auto; }
+  .timeDate { font-size: 7px; }
+  .timeTime { font-size: 8px; }
+
+  /* Play button: compact */
+  .playBtn { padding: 4px 8px; min-width: auto; min-height: auto; }
+
+  /* Current: horizontal row, flex-fill between play and live */
   .current {
-    min-width: 80px;
-    padding-left: 6px;
+    flex: 1; flex-direction: row; align-items: center;
+    gap: 6px; justify-content: center;
+    min-width: auto; padding-left: 0; border-left: none;
   }
 
-  .warning {
-    font-size: 8px;
-    padding: 4px 8px;
-  }
+  /* LIVE button: compact, no oversized red box */
+  .liveBtn { padding: 4px 8px; min-height: auto; }
+
+  /* Slider thumb: smaller */
+  .slider::-webkit-slider-thumb { width: 14px; height: 14px; }
+  .slider::-moz-range-thumb { width: 14px; height: 14px; }
+
+  .warning { font-size: 8px; padding: 4px 8px; }
 }

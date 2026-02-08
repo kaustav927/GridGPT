@@ -1111,7 +1111,7 @@ export default function OntarioMap({ onZoneSelect, selectedZone }: Props) {
 
   return (
     <>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', fontSize: '10px', alignItems: 'center', padding: '8px 12px 6px 12px' }}>
+      <div className={styles.legendBar} style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', fontSize: '10px', alignItems: 'center', padding: '8px 12px 6px 12px' }}>
           {avgPrice !== null && (
             <div style={{ color: '#8B949E', whiteSpace: 'nowrap' }}>
               Avg: <span style={{ color: priceToColor(avgPrice), fontWeight: 600 }}>${avgPrice.toFixed(2)}</span>
@@ -1215,7 +1215,7 @@ export default function OntarioMap({ onZoneSelect, selectedZone }: Props) {
       {!mounted || loading ? (
         <div className={styles.placeholder}>Loading map...</div>
       ) : (
-        <div style={{ flex: 1, minHeight: 0, width: '100%', position: 'relative' }}>
+        <div className={styles.mapContainer} style={{ flex: 1, minHeight: 0, width: '100%', position: 'relative' }}>
           <MapContent
             zonePrices={zonePrices}
             selectedZone={selectedZone}

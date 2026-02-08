@@ -17,8 +17,8 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Ontario Grid Cockpit",
-  description: "Real-time electricity grid monitoring for Ontario",
+  title: "GridGPT",
+  description: "Real-time electricity grid monitoring and AI-powered analytics for Ontario",
 };
 
 export default function RootLayout({

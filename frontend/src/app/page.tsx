@@ -10,6 +10,7 @@ import MarketChart from '@/components/MarketChart';
 import Interties from '@/components/Interties';
 import GridChat from '@/components/GridChat';
 import PanelWrapper from '@/components/PanelWrapper';
+import Footer from '@/components/Footer';
 
 export default function Dashboard() {
   const [currentTime, setCurrentTime] = useState<Date | null>(null);
@@ -50,7 +51,7 @@ export default function Dashboard() {
       <header className={styles.header}>
         <div className={styles.brandSection}>
           <Icon icon="lightning" size={24} color="#58A6FF" />
-          <h1 className={styles.title}>ONTARIO GRID COCKPIT</h1>
+          <h1 className={styles.title}>GridGPT</h1>
         </div>
         <div className={styles.statusSection}>
           <div className={styles.liveStatus}>
@@ -68,10 +69,10 @@ export default function Dashboard() {
       <div className={styles.mainContent}>
         {/* Left Panel */}
         <div className={styles.leftPanel}>
-          <PanelWrapper title="FUEL MIX">
+          <PanelWrapper title="FUEL MIX" className={styles.panelFuelMix}>
             <FuelMix />
           </PanelWrapper>
-          <PanelWrapper title="GENERATION BY RESOURCE">
+          <PanelWrapper title="GENERATION BY RESOURCE" className={styles.panelGenByResource}>
             <GenerationByResource />
           </PanelWrapper>
         </div>
@@ -80,6 +81,7 @@ export default function Dashboard() {
         <div className={styles.centerPanel}>
           <PanelWrapper
             title="ONTARIO ZONE MAP"
+            className={styles.panelMap}
             bodyClassName={styles.mapPanelBody}
             bodyStyle={{ aspectRatio: '1 / 0.85' }}
           >
@@ -88,21 +90,23 @@ export default function Dashboard() {
               onZoneSelect={handleZoneSelect}
             />
           </PanelWrapper>
-          <PanelWrapper title="MARKET OVERVIEW" bodyClassName={styles.chartPanelBody}>
+          <PanelWrapper title="MARKET OVERVIEW" className={styles.panelMarketOverview} bodyClassName={styles.chartPanelBody}>
             <MarketChart />
           </PanelWrapper>
         </div>
 
         {/* Right Panel */}
         <div className={styles.rightPanel}>
-          <PanelWrapper title="GRID AI" bodyClassName={styles.chatPanelBody} style={{ flex: '1 1 0', minHeight: 0, maxHeight: '45%' }}>
+          <PanelWrapper title="GRID AI" className={styles.panelGridAI} bodyClassName={styles.chatPanelBody}>
             <GridChat />
           </PanelWrapper>
-          <PanelWrapper title="INTERTIES">
+          <PanelWrapper title="INTERTIES" className={styles.panelInterties}>
             <Interties />
           </PanelWrapper>
         </div>
       </div>
+
+      <Footer />
     </div>
   );
 }

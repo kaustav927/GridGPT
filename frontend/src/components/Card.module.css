@@ -139,6 +139,14 @@
   }
 }
 
+/* MarketChart legend + chart area for mobile reordering */
+.chartArea {}
+.legend {}
+
+/* Legend and map container for OntarioMap */
+.legendBar { display: flex; flex-wrap: wrap; gap: 10px; font-size: 10px; align-items: center; padding: 8px 12px 6px; }
+.mapContainer { flex: 1; min-height: 0; width: 100%; }
+
 /* Mobile - restore comfortable sizing */
 @media (max-width: 900px) {
   .card {
@@ -162,5 +170,18 @@
 
   .weatherBar {
     gap: 6px;
+  }
+
+  /* Reorder map internals: map first, legend second, buttons third */
+  .legendBar { order: 2; padding: 6px 12px; gap: 6px; font-size: 9px; }
+  .mapContainer { order: 1; }
+  .weatherBar { order: 3; }
+
+  /* MarketChart: controls first, chart second, legend third (wrapping) */
+  .chartArea { order: 2; }
+  .legend {
+    order: 3;
+    flex-wrap: wrap !important;
+    gap: 6px 12px !important;
   }
 }

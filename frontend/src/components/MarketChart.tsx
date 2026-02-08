@@ -567,88 +567,10 @@ export default function MarketChart() {
           )}
         </div>
 
-        {/* Row 2: Compact legend - single row */}
-        <div style={{ display: 'flex', gap: '12px', fontSize: '9px', alignItems: 'center', flexWrap: 'nowrap' }}>
-          <LegendItem
-            color="#39D5FF"
-            label="Demand"
-            value={stats.currentDemand}
-            tooltip="Ontario's internal electricity consumption"
-            isVisible={visibleLines.demand}
-            onToggle={() => toggleLine('demand')}
-          />
-          {hasGridLoad && (
-            <LegendItem
-              color="#A371F7"
-              label="Grid"
-              value={stats.currentGridLoad}
-              tooltip="Supply minus transmission losses"
-              isVisible={visibleLines.gridLoad}
-              onToggle={() => toggleLine('gridLoad')}
-            />
-          )}
-          {hasSupply && (
-            <LegendItem
-              color="#3FB950"
-              label="Supply"
-              value={stats.currentSupply}
-              tooltip="Total generation dispatched to the grid"
-              isVisible={visibleLines.supply}
-              onToggle={() => toggleLine('supply')}
-            />
-          )}
-          <LegendItem
-            color="#D29922"
-            label="Price"
-            value={stats.currentPrice}
-            isPrice
-            tooltip="Average Ontario electricity price"
-            isVisible={visibleLines.price}
-            onToggle={() => toggleLine('price')}
-          />
-          {stats.avgPrice !== null && (
-            <span style={{ color: '#8B949E' }}>
-              Avg: <span style={{ fontWeight: 600 }}>{formatPrice(stats.avgPrice)}</span>
-            </span>
-          )}
-          {showDayAhead && (
-            <>
-              <div style={{ width: 1, height: 10, background: '#30363D' }} />
-              <LegendItem
-                color="#39D5FF"
-                label="Fcst Demand"
-                value={null}
-                tooltip={forecastTarget === 'today' ? "Today's forecasted demand (day-ahead)" : "Tomorrow's projected demand forecast"}
-                isDotted
-                isVisible={visibleLines.projDemand}
-                onToggle={() => toggleLine('projDemand')}
-              />
-              <LegendItem
-                color="#3FB950"
-                label="Fcst Supply"
-                value={null}
-                tooltip={forecastTarget === 'today' ? "Today's forecasted supply (day-ahead)" : "Tomorrow's projected supply forecast"}
-                isDotted
-                isVisible={visibleLines.projSupply}
-                onToggle={() => toggleLine('projSupply')}
-              />
-              <LegendItem
-                color="#D29922"
-                label="Fcst Price"
-                value={null}
-                tooltip={forecastTarget === 'today' ? "Today's forecasted price (day-ahead)" : "Tomorrow's projected average price"}
-                isDotted
-                isPrice
-                isVisible={visibleLines.projPrice}
-                onToggle={() => toggleLine('projPrice')}
-              />
-            </>
-          )}
-        </div>
       </div>
 
       {/* Chart area - flex to fill remaining space */}
-      <div style={{ flex: 1, minHeight: 200 }}>
+      <div className={styles.chartArea} style={{ flex: 1, minHeight: 200 }}>
         {error ? (
           <div className={styles.placeholder} style={{ color: '#F85149' }}>
             Error: {error}
@@ -852,6 +774,85 @@ export default function MarketChart() {
             )}
           </ComposedChart>
         </ResponsiveContainer>
+        )}
+      </div>
+
+      {/* Legend - placed after chart for mobile reordering */}
+      <div className={styles.legend} style={{ display: 'flex', gap: '12px', fontSize: '9px', alignItems: 'center', flexWrap: 'nowrap' }}>
+        <LegendItem
+          color="#39D5FF"
+          label="Demand"
+          value={stats.currentDemand}
+          tooltip="Ontario's internal electricity consumption"
+          isVisible={visibleLines.demand}
+          onToggle={() => toggleLine('demand')}
+        />
+        {hasGridLoad && (
+          <LegendItem
+            color="#A371F7"
+            label="Grid"
+            value={stats.currentGridLoad}
+            tooltip="Supply minus transmission losses"
+            isVisible={visibleLines.gridLoad}
+            onToggle={() => toggleLine('gridLoad')}
+          />
+        )}
+        {hasSupply && (
+          <LegendItem
+            color="#3FB950"
+            label="Supply"
+            value={stats.currentSupply}
+            tooltip="Total generation dispatched to the grid"
+            isVisible={visibleLines.supply}
+            onToggle={() => toggleLine('supply')}
+          />
+        )}
+        <LegendItem
+          color="#D29922"
+          label="Price"
+          value={stats.currentPrice}
+          isPrice
+          tooltip="Average Ontario electricity price"
+          isVisible={visibleLines.price}
+          onToggle={() => toggleLine('price')}
+        />
+        {stats.avgPrice !== null && (
+          <span style={{ color: '#8B949E' }}>
+            Avg: <span style={{ fontWeight: 600 }}>{formatPrice(stats.avgPrice)}</span>
+          </span>
+        )}
+        {showDayAhead && (
+          <>
+            <div style={{ width: 1, height: 10, background: '#30363D' }} />
+            <LegendItem
+              color="#39D5FF"
+              label="Fcst Demand"
+              value={null}
+              tooltip={forecastTarget === 'today' ? "Today's forecasted demand (day-ahead)" : "Tomorrow's projected demand forecast"}
+              isDotted
+              isVisible={visibleLines.projDemand}
+              onToggle={() => toggleLine('projDemand')}
+            />
+            <LegendItem
+              color="#3FB950"
+              label="Fcst Supply"
+              value={null}
+              tooltip={forecastTarget === 'today' ? "Today's forecasted supply (day-ahead)" : "Tomorrow's projected supply forecast"}
+              isDotted
+              isVisible={visibleLines.projSupply}
+              onToggle={() => toggleLine('projSupply')}
+            />
+            <LegendItem
+              color="#D29922"
+              label="Fcst Price"
+              value={null}
+              tooltip={forecastTarget === 'today' ? "Today's forecasted price (day-ahead)" : "Tomorrow's projected average price"}
+              isDotted
+              isPrice
+              isVisible={visibleLines.projPrice}
+              onToggle={() => toggleLine('projPrice')}
+            />
+          </>
         )}
       </div>
     </>

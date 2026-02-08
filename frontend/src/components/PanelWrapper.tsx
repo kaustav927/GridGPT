@@ -8,6 +8,8 @@ interface PanelWrapperProps {
   children: ReactNode;
   defaultCollapsed?: boolean;
   hideExpand?: boolean;
+  /** Extra class on the outer card */
+  className?: string;
   /** Extra class on the body area */
   bodyClassName?: string;
   /** Extra inline style on the outer card */
@@ -21,6 +23,7 @@ export default function PanelWrapper({
   children,
   defaultCollapsed = false,
   hideExpand = false,
+  className,
   bodyClassName,
   style,
   bodyStyle,
@@ -38,7 +41,7 @@ export default function PanelWrapper({
 
   return (
     <>
-      <div className={`${styles.card} ${collapsed ? styles.collapsed : ''}`} style={style}>
+      <div className={`${styles.card} ${collapsed ? styles.collapsed : ''} ${className || ''}`} style={style}>
         {/* Header bar — always visible */}
         <div className={styles.header}>
           <h2 className={styles.title}>{title}</h2>
