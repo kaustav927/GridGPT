@@ -78,6 +78,8 @@
   max-width: 1920px;
   margin: 0 auto;
   overflow: visible; /* Allow tooltips to overflow grid bounds */
+  height: calc(100vh - 48px - 24px); /* viewport minus header(48px) minus vertical padding(12px*2) */
+  grid-template-rows: 1fr;
 }
 
 .leftPanel,
@@ -90,6 +92,10 @@
   overflow: visible; /* Allow tooltips to overflow panel bounds */
 }
 
+.rightPanel {
+  min-height: 0; /* Override auto minimum so grid track constrains height */
+}
+
 /* Large laptop breakpoint - use percentage caps to keep center dominant */
 @media (max-width: 1600px) {
   .mainContent {
@@ -97,6 +103,8 @@
     grid-template-columns: minmax(260px, 23%) 1fr minmax(240px, 21%);
     gap: 10px;
     padding: 10px;
+    height: calc(100vh - 48px - 20px);
+    grid-template-rows: 1fr;
   }
 
   .leftPanel,
@@ -113,6 +121,8 @@
     grid-template-columns: minmax(240px, 22%) 1fr minmax(220px, 20%);
     gap: 8px;
     padding: 8px;
+    height: calc(100vh - 48px - 16px);
+    grid-template-rows: 1fr;
   }
 
   .leftPanel,
@@ -129,6 +139,8 @@
     grid-template-columns: minmax(220px, 21%) 1fr minmax(200px, 19%);
     gap: 6px;
     padding: 6px;
+    height: calc(100vh - 48px - 12px);
+    grid-template-rows: 1fr;
   }
 
   .leftPanel,
@@ -145,6 +157,8 @@
     grid-template-columns: minmax(200px, 20%) 1fr minmax(180px, 18%);
     gap: 5px;
     padding: 5px;
+    height: calc(100vh - 48px - 10px);
+    grid-template-rows: 1fr;
   }
 
   .leftPanel,
@@ -154,12 +168,28 @@
   }
 }
 
+/* Custom PanelWrapper body overrides */
+.mapPanelBody {
+  overflow: hidden !important;
+  padding: 0 !important;
+}
+
+.chartPanelBody {
+  padding: 8px 12px !important;
+}
+
+.chatPanelBody {
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
 /* Mobile/tablet - single column */
 @media (max-width: 900px) {
   .mainContent {
     grid-template-columns: 1fr;
     gap: 12px;
     padding: 12px;
+    height: auto; /* Single column layout scrolls naturally */
   }
 
   .leftPanel,

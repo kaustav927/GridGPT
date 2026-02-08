@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
-import { Card, Icon } from '@blueprintjs/core';
+import { Icon } from '@blueprintjs/core';
 import styles from './Card.module.css';
 import ontarioZones from '@/data/ontario-zones.geojson';
 import { GENERATION_SITES, FUEL_COLORS } from '@/data/generation-sites';
@@ -1110,10 +1110,8 @@ export default function OntarioMap({ onZoneSelect, selectedZone }: Props) {
   }, [zonePrices]);
 
   return (
-    <Card className={styles.card} style={{ aspectRatio: '1 / 0.85', position: 'relative', display: 'flex', flexDirection: 'column' }}>
-      <div className={styles.headerRow}>
-        <h2 className={styles.header}>ONTARIO ZONE MAP</h2>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', fontSize: '10px', alignItems: 'center' }}>
+    <>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', fontSize: '10px', alignItems: 'center', padding: '8px 12px 6px 12px' }}>
           {avgPrice !== null && (
             <div style={{ color: '#8B949E', whiteSpace: 'nowrap' }}>
               Avg: <span style={{ color: priceToColor(avgPrice), fontWeight: 600 }}>${avgPrice.toFixed(2)}</span>
@@ -1213,7 +1211,6 @@ export default function OntarioMap({ onZoneSelect, selectedZone }: Props) {
             </div>
           )}
         </div>
-      </div>
 
       {!mounted || loading ? (
         <div className={styles.placeholder}>Loading map...</div>
@@ -1246,7 +1243,7 @@ export default function OntarioMap({ onZoneSelect, selectedZone }: Props) {
         </div>
       )}
 
-      <div className={styles.weatherBar}>
+      <div className={styles.weatherBar} style={{ padding: '8px 12px 8px' }}>
         <button
           className={showPricing ? styles.weatherBtnActive : styles.weatherBtn}
           onClick={() => setShowPricing((v) => !v)}
@@ -1356,6 +1353,6 @@ export default function OntarioMap({ onZoneSelect, selectedZone }: Props) {
           transition: opacity 0.3s ease-in-out;
         }
       `}</style>
-    </Card>
+    </>
   );
 }

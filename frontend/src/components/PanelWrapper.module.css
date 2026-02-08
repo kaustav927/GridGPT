@@ -1,0 +1,199 @@
+/* Card container — matches existing Card.module.css styling */
+.card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+  z-index: 1;
+}
+
+.card.collapsed {
+  flex: 0 0 auto !important;
+}
+
+/* Header bar — title left, buttons right, divider underneath */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.headerButtons {
+  display: flex;
+  gap: 6px;
+}
+
+.headerBtn {
+  background: none;
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  padding: 3px 8px;
+  cursor: pointer;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.headerBtn:hover {
+  color: var(--text-primary);
+  border-color: var(--text-secondary);
+}
+
+/* Chevron rotation */
+.chevronDown,
+.chevronRight {
+  display: inline-block;
+  font-size: 16px;
+  font-weight: 700;
+  transition: transform 0.15s ease;
+  line-height: 1;
+}
+
+.chevronDown {
+  transform: rotate(-90deg);
+}
+
+.chevronRight {
+  transform: rotate(0deg);
+}
+
+/* Body — padded content area */
+.body {
+  padding: 16px;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Fullscreen overlay */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.expandedCard {
+  width: 90vw;
+  max-width: 1400px;
+  height: 90vh;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.expandedBody {
+  flex: 1;
+  overflow: auto;
+  padding: 16px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Responsive */
+@media (max-width: 1600px) {
+  .body {
+    padding: 14px;
+  }
+}
+
+@media (max-width: 1400px) {
+  .header {
+    padding: 8px 10px;
+  }
+
+  .headerBtn {
+    font-size: 11px;
+    padding: 2px 6px;
+  }
+
+  .body {
+    padding: 12px;
+  }
+
+  .title {
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 1200px) {
+  .header {
+    padding: 7px 10px;
+  }
+
+  .body {
+    padding: 10px;
+  }
+
+  .title {
+    font-size: 11px;
+  }
+
+  .headerBtn {
+    font-size: 10px;
+    padding: 2px 5px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .header {
+    padding: 6px 8px;
+  }
+
+  .body {
+    padding: 8px;
+  }
+
+  .title {
+    font-size: 10px;
+  }
+
+  .headerBtn {
+    font-size: 10px;
+    padding: 1px 4px;
+  }
+}
+
+@media (max-width: 900px) {
+  .header {
+    padding: 10px 12px;
+  }
+
+  .body {
+    padding: 16px;
+  }
+
+  .title {
+    font-size: 12px;
+  }
+
+  .headerBtn {
+    font-size: 12px;
+    padding: 3px 8px;
+  }
+}

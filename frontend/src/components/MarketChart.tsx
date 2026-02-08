@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { Card, ButtonGroup, Button, Switch, Tooltip } from '@blueprintjs/core';
+import { ButtonGroup, Button, Switch, Tooltip } from '@blueprintjs/core';
 import {
   ComposedChart,
   Line,
@@ -456,24 +456,23 @@ export default function MarketChart() {
       timeZone: 'America/Toronto'
     });
 
-    return `MARKET OVERVIEW — ${dateStr}`;
+    return dateStr;
   }, [showDayAhead, forecastTarget]);
 
   return (
-    <Card className={styles.card} style={{ height: 320, display: 'flex', flexDirection: 'column', padding: '12px 16px' }}>
-      {/* Fixed header section - max 80px with proper spacing */}
+    <>
+      {/* Controls section */}
       <div style={{
         flexShrink: 0,
-        maxHeight: 80,
         overflow: 'visible',
         display: 'flex',
         flexDirection: 'column',
         gap: '8px'
       }}>
-        {/* Row 1: Title + Controls + Peak Info */}
+        {/* Row 1: Date + Controls + Peak Info */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <h2 className={styles.header} style={{ margin: 0 }}>{chartTitle}</h2>
+            <span style={{ fontSize: '10px', color: '#8B949E' }}>{chartTitle}</span>
             <ButtonGroup minimal>
               {(['1H', 'Today'] as TimeRange[]).map((range) => (
                 <Button
@@ -649,7 +648,7 @@ export default function MarketChart() {
       </div>
 
       {/* Chart area - flex to fill remaining space */}
-      <div style={{ flex: 1, minHeight: 0 }}>
+      <div style={{ flex: 1, minHeight: 200 }}>
         {error ? (
           <div className={styles.placeholder} style={{ color: '#F85149' }}>
             Error: {error}
@@ -855,6 +854,6 @@ export default function MarketChart() {
         </ResponsiveContainer>
         )}
       </div>
-    </Card>
+    </>
   );
 }

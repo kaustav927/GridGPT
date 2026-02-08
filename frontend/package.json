@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.73.0",
     "@blueprintjs/core": "^6.6.1",
     "@blueprintjs/icons": "^6.5.0",
     "@blueprintjs/select": "^6.0.13",

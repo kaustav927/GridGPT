@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
-import { Card, Spinner, HTMLTable, ButtonGroup, Button } from '@blueprintjs/core';
+import { Spinner, HTMLTable, ButtonGroup, Button } from '@blueprintjs/core';
 import { ResponsivePie } from '@nivo/pie';
 import {
   RadarChart,
@@ -525,7 +525,7 @@ export default function FuelMix() {
 
   const renderRadarView = () => (
     <div className={styles.radarContainer} onClick={handleCardClick}>
-      <ResponsiveContainer width="100%" height={220}>
+      <ResponsiveContainer width="100%" height="100%">
         <RadarChart data={radarData} margin={{ top: 10, right: 30, bottom: 10, left: 30 }}>
           <PolarGrid stroke="#30363D" />
           <PolarAngleAxis
@@ -587,40 +587,37 @@ export default function FuelMix() {
   );
 
   return (
-    <Card className={styles.card}>
-      <div className={styles.headerRow}>
-        <h2 className={styles.header}>FUEL MIX</h2>
-        <div className={styles.headerRight}>
-          <ButtonGroup minimal className={styles.toggleGroup}>
-            <Button
-              small
-              active={viewMode === 'donut'}
-              onClick={() => setViewMode('donut')}
-              className={styles.toggleButton}
-            >
-              Donut
-            </Button>
-            <Button
-              small
-              active={viewMode === 'table'}
-              onClick={() => setViewMode('table')}
-              className={styles.toggleButton}
-            >
-              Table
-            </Button>
-            <Button
-              small
-              active={viewMode === 'radar'}
-              onClick={() => setViewMode('radar')}
-              className={styles.toggleButton}
-            >
-              Radar
-            </Button>
-          </ButtonGroup>
-          {dataTimestamp && (
-            <span className={styles.asOfTime}>As of {formatAsOfTime(dataTimestamp)}</span>
-          )}
-        </div>
+    <>
+      <div className={styles.headerRight}>
+        <ButtonGroup minimal className={styles.toggleGroup}>
+          <Button
+            small
+            active={viewMode === 'donut'}
+            onClick={() => setViewMode('donut')}
+            className={styles.toggleButton}
+          >
+            Donut
+          </Button>
+          <Button
+            small
+            active={viewMode === 'table'}
+            onClick={() => setViewMode('table')}
+            className={styles.toggleButton}
+          >
+            Table
+          </Button>
+          <Button
+            small
+            active={viewMode === 'radar'}
+            onClick={() => setViewMode('radar')}
+            className={styles.toggleButton}
+          >
+            Radar
+          </Button>
+        </ButtonGroup>
+        {dataTimestamp && (
+          <span className={styles.asOfTime}>As of {formatAsOfTime(dataTimestamp)}</span>
+        )}
       </div>
 
       {loading ? (
@@ -634,6 +631,6 @@ export default function FuelMix() {
           {viewMode === 'radar' && renderRadarView()}
         </div>
       )}
-    </Card>
+    </>
   );
 }

@@ -1,8 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Card, Icon } from '@blueprintjs/core';
-import styles from './Card.module.css';
+import { Icon } from '@blueprintjs/core';
 
 interface IntertieRow {
   flow_group: string;
@@ -73,8 +72,7 @@ export default function Interties() {
   const hasNetFlow = Math.abs(netFlow) > 1;
 
   return (
-    <Card className={styles.card}>
-      <h2 className={styles.header}>INTERTIES</h2>
+    <>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
         {DISPLAY_ORDER.map(({ key, label }) => {
           // API convention: positive = export from Ontario, negative = import to Ontario
@@ -163,6 +161,6 @@ export default function Interties() {
           </div>
         </div>
       </div>
-    </Card>
+    </>
   );
 }

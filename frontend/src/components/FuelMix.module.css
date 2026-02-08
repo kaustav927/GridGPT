@@ -34,6 +34,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
+  margin-bottom: 12px;
 }
 
 .asOfTime {
@@ -77,6 +78,10 @@
 /* Content area for click-to-deselect */
 .contentArea {
   cursor: default;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 /* ---------------------------------------------------------------------------
@@ -114,6 +119,8 @@
   align-items: center;
   position: relative;
   z-index: 1;
+  flex: 1;
+  min-height: 0;
 }
 
 /* Ensure Nivo tooltips are visible above other elements */
@@ -124,6 +131,8 @@
 .chartContainer {
   position: relative;
   height: 200px;
+  flex: 1;
+  min-height: 150px;
   width: 100%;
   /* Note: overflow visible to allow tooltips - hover expansion disabled via activeOuterRadiusOffset={0} */
 }
@@ -238,6 +247,8 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  flex: 1;
+  min-height: 0;
 }
 
 /* ---------------------------------------------------------------------------

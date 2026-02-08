@@ -20,7 +20,7 @@ export default function TimeScrubber({
   isPlaying,
   onPlayPause,
   onLiveClick,
-  priceSource = 'realtime',
+  // priceSource - reserved for future price source badge
   showWeatherOverlay = false,
 }: Props) {
   // Memoize time boundaries to prevent re-renders

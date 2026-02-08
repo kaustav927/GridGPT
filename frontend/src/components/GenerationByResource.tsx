@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo, useCallback } from "react";
-import { Card, Spinner } from "@blueprintjs/core";
+import { Spinner } from "@blueprintjs/core";
 import {
   AreaChart,
   Area,
@@ -273,56 +273,51 @@ export default function GenerationByResource() {
     s.plants.some((p) => p.output_mw > 0 || p.history.length > 0),
   );
 
-  return (
-    <Card className={styles.card}>
-      <h2 className={styles.header}>GENERATION BY RESOURCE</h2>
-      {loading ? (
-        <div className={styles.loading}>
-          <Spinner size={24} />
+  return loading ? (
+    <div className={styles.loading}>
+      <Spinner size={24} />
+    </div>
+  ) : (
+    <div className={styles.content}>
+      {visibleSections.map(({ section, plants, total }) => (
+        <div key={section.id} className={styles.fuelSection}>
+          <div
+            className={styles.sectionHeader}
+            style={{
+              background: section.bgColor,
+              borderLeft: `3px solid ${section.color}`,
+            }}
+          >
+            <span
+              className={styles.fuelLabel}
+              style={{ color: section.color }}
+            >
+              {section.label}
+            </span>
+            <span
+              className={styles.fuelTotal}
+              style={{ color: section.color }}
+            >
+              {Math.round(total).toLocaleString()}
+            </span>
+          </div>
+          <div
+            className={
+              plants.length <= 2 ? styles.plantGridTwo : styles.plantGrid
+            }
+          >
+            {plants.map((plant) => (
+              <PlantChart
+                key={plant.name}
+                plant={plant}
+                color={section.color}
+                hideYAxis={viewportWidth <= 1024 && viewportWidth > 900}
+              />
+            ))}
+          </div>
         </div>
-      ) : (
-        <div className={styles.content}>
-          {visibleSections.map(({ section, plants, total }) => (
-            <div key={section.id} className={styles.fuelSection}>
-              <div
-                className={styles.sectionHeader}
-                style={{
-                  background: section.bgColor,
-                  borderLeft: `3px solid ${section.color}`,
-                }}
-              >
-                <span
-                  className={styles.fuelLabel}
-                  style={{ color: section.color }}
-                >
-                  {section.label}
-                </span>
-                <span
-                  className={styles.fuelTotal}
-                  style={{ color: section.color }}
-                >
-                  {Math.round(total).toLocaleString()}
-                </span>
-              </div>
-              <div
-                className={
-                  plants.length <= 2 ? styles.plantGridTwo : styles.plantGrid
-                }
-              >
-                {plants.map((plant) => (
-                  <PlantChart
-                    key={plant.name}
-                    plant={plant}
-                    color={section.color}
-                    hideYAxis={viewportWidth <= 1024 && viewportWidth > 900}
-                  />
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </Card>
+      ))}
+    </div>
   );
 }
 

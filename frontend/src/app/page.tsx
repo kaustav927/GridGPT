@@ -8,6 +8,8 @@ import GenerationByResource from '@/components/GenerationByResource';
 import OntarioMap from '@/components/OntarioMap';
 import MarketChart from '@/components/MarketChart';
 import Interties from '@/components/Interties';
+import GridChat from '@/components/GridChat';
+import PanelWrapper from '@/components/PanelWrapper';
 
 export default function Dashboard() {
   const [currentTime, setCurrentTime] = useState<Date | null>(null);
@@ -66,23 +68,39 @@ export default function Dashboard() {
       <div className={styles.mainContent}>
         {/* Left Panel */}
         <div className={styles.leftPanel}>
-          <FuelMix />
-          <GenerationByResource />
+          <PanelWrapper title="FUEL MIX">
+            <FuelMix />
+          </PanelWrapper>
+          <PanelWrapper title="GENERATION BY RESOURCE">
+            <GenerationByResource />
+          </PanelWrapper>
         </div>
 
         {/* Center Panel */}
         <div className={styles.centerPanel}>
-          <OntarioMap
-            selectedZone={selectedZone}
-            onZoneSelect={handleZoneSelect}
-          />
-          <MarketChart />
+          <PanelWrapper
+            title="ONTARIO ZONE MAP"
+            bodyClassName={styles.mapPanelBody}
+            bodyStyle={{ aspectRatio: '1 / 0.85' }}
+          >
+            <OntarioMap
+              selectedZone={selectedZone}
+              onZoneSelect={handleZoneSelect}
+            />
+          </PanelWrapper>
+          <PanelWrapper title="MARKET OVERVIEW" bodyClassName={styles.chartPanelBody}>
+            <MarketChart />
+          </PanelWrapper>
         </div>
 
         {/* Right Panel */}
         <div className={styles.rightPanel}>
-          <Interties />
-          {/* Space reserved for future chatbot */}
+          <PanelWrapper title="GRID AI" bodyClassName={styles.chatPanelBody} style={{ flex: '1 1 0', minHeight: 0, maxHeight: '45%' }}>
+            <GridChat />
+          </PanelWrapper>
+          <PanelWrapper title="INTERTIES">
+            <Interties />
+          </PanelWrapper>
         </div>
       </div>
     </div>
