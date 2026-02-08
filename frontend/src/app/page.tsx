@@ -69,7 +69,7 @@ export default function Dashboard() {
       <div className={styles.mainContent}>
         {/* Left Panel */}
         <div className={styles.leftPanel}>
-          <PanelWrapper title="FUEL MIX" className={styles.panelFuelMix}>
+          <PanelWrapper title="FUEL MIX" className={styles.panelFuelMix} bodyClassName={styles.fuelMixBody}>
             <FuelMix />
           </PanelWrapper>
           <PanelWrapper title="GENERATION BY RESOURCE" className={styles.panelGenByResource}>

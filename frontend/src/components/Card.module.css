@@ -142,6 +142,8 @@
 /* MarketChart legend + chart area for mobile reordering */
 .chartArea {}
 .legend {}
+.controls {}
+.controlsRow1 {}
 
 /* Legend and map container for OntarioMap */
 .legendBar { display: flex; flex-wrap: wrap; gap: 10px; font-size: 10px; align-items: center; padding: 8px 12px 6px; }
@@ -178,10 +180,21 @@
   .weatherBar { order: 3; }
 
   /* MarketChart: controls first, chart second, legend third (wrapping) */
+  .controls { order: 1; }
   .chartArea { order: 2; }
   .legend {
     order: 3;
     flex-wrap: wrap !important;
     gap: 6px 12px !important;
+  }
+
+  /* MarketChart controls: stack vertically on mobile */
+  .controlsRow1 {
+    flex-direction: column !important;
+    align-items: center !important;
+    gap: 6px !important;
+  }
+  .controlsRow1 > div {
+    justify-content: center;
   }
 }

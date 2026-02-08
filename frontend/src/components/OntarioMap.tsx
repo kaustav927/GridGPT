@@ -174,7 +174,10 @@ function MapContent({
 
       // Compute Ontario bounds from GeoJSON for initial view (without adding the layer)
       const boundsLayer = L.geoJSON(ontarioZones as GeoJSON.FeatureCollection);
-      map.fitBounds(boundsLayer.getBounds(), { padding: [10, 10] });
+      // More padding on small screens so zones aren't cut off at edges
+      const isMobile = window.innerWidth <= 900;
+      const fitPadding: [number, number] = isMobile ? [30, 20] : [10, 10];
+      map.fitBounds(boundsLayer.getBounds(), { padding: fitPadding });
 
       // Signal that map is ready for layers
       setMapReady(true);

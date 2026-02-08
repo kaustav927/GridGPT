@@ -255,6 +255,14 @@ export default function MarketChart() {
   const [peakData, setPeakData] = useState<PeakDemandResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth <= 900);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
 
   // Check if tomorrow's forecast data is available (published after 13:00 ET)
   const isTomorrowAvailable = useMemo(() => {
@@ -462,7 +470,7 @@ export default function MarketChart() {
   return (
     <>
       {/* Controls section */}
-      <div style={{
+      <div className={styles.controls} style={{
         flexShrink: 0,
         overflow: 'visible',
         display: 'flex',
@@ -470,7 +478,7 @@ export default function MarketChart() {
         gap: '8px'
       }}>
         {/* Row 1: Date + Controls + Peak Info */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div className={styles.controlsRow1} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <span style={{ fontSize: '10px', color: '#8B949E' }}>{chartTitle}</span>
             <ButtonGroup minimal>
@@ -581,7 +589,7 @@ export default function MarketChart() {
           <div className={styles.placeholder}>No data available for selected time range</div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={chartData} margin={{ top: 10, right: 60, left: 10, bottom: 0 }}>
+          <ComposedChart data={chartData} margin={{ top: 10, right: isMobile ? 30 : 60, left: isMobile ? 5 : 10, bottom: 0 }}>
             <defs>
               <linearGradient id="demandGradient" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="#39D5FF" stopOpacity={0.3} />

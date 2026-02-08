@@ -52,7 +52,7 @@
 /* Content */
 .content {
   flex: 1;
-  max-width: 720px;
+  max-width: 860px;
   width: 100%;
   margin: 0 auto;
   padding: 48px 24px 64px;
@@ -80,7 +80,7 @@
 
 /* Sections */
 .section {
-  margin-bottom: 40px;
+  margin-bottom: 48px;
 }
 
 .sectionTitle {
@@ -106,7 +106,226 @@
   text-decoration: underline;
 }
 
-/* Pipeline diagram */
+.prose strong {
+  color: var(--text-primary);
+}
+
+/* Bullet List (Why Blueprint.js, etc.) */
+.bulletList {
+  list-style: none;
+  margin: 16px 0;
+  padding: 0;
+}
+
+.bulletList li {
+  position: relative;
+  padding: 6px 0 6px 20px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+.bulletList li::before {
+  content: '\25B8';
+  position: absolute;
+  left: 0;
+  color: var(--accent-cyan);
+}
+
+.bulletList li strong {
+  color: var(--text-primary);
+}
+
+/* Architecture Diagram */
+.diagram {
+  margin: 24px 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.diagramTitle {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin: 0 0 16px;
+}
+
+.archFlow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  min-width: 320px;
+}
+
+.archNode {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  padding: 12px 20px;
+  width: 100%;
+  max-width: 600px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.archNodeIcon {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 16px;
+}
+
+.archNodeContent {
+  flex: 1;
+  min-width: 0;
+}
+
+.archNodeName {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  display: block;
+}
+
+.archNodeDesc {
+  font-size: 11px;
+  color: var(--text-muted);
+  display: block;
+  margin-top: 2px;
+  line-height: 1.4;
+}
+
+.archNodeTech {
+  font-family: var(--font-geist-mono), 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--accent-cyan);
+  display: block;
+  margin-top: 3px;
+}
+
+.archArrow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4px 0;
+  color: var(--text-muted);
+}
+
+.archArrowLine {
+  width: 1px;
+  height: 12px;
+  background: var(--border-color);
+}
+
+.archArrowLabel {
+  font-size: 10px;
+  color: var(--text-muted);
+  padding: 2px 0;
+}
+
+.archArrowHead {
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 6px solid var(--border-color);
+}
+
+/* Branch nodes (for API routes fan-out) */
+.archBranch {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 8px;
+  width: 100%;
+  max-width: 600px;
+}
+
+.archBranchNode {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  padding: 8px 12px;
+}
+
+.archBranchName {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  display: block;
+}
+
+.archBranchDesc {
+  font-size: 10px;
+  color: var(--text-muted);
+  display: block;
+  margin-top: 2px;
+}
+
+/* Color accents for architecture nodes */
+.nodeIESO { border-left: 3px solid #D29922; }
+.nodePython { border-left: 3px solid #3FB950; }
+.nodeKafka { border-left: 3px solid #F85149; }
+.nodeClickHouse { border-left: 3px solid #39D5FF; }
+.nodeNextJS { border-left: 3px solid #E6EDF3; }
+.nodeVercel { border-left: 3px solid #E6EDF3; }
+.nodeDocker { border-left: 3px solid #58A6FF; }
+.nodeWeather { border-left: 3px solid #3FB950; }
+.nodeClaude { border-left: 3px solid #D29922; }
+.nodeSSE { border-left: 3px solid #39D5FF; }
+.nodeFrontend { border-left: 3px solid #58A6FF; }
+
+/* Docker boundary box */
+.dockerBoundary {
+  border: 1px dashed var(--accent-blue);
+  padding: 16px;
+  width: 100%;
+  max-width: 600px;
+  position: relative;
+}
+
+.dockerLabel {
+  position: absolute;
+  top: -10px;
+  left: 16px;
+  background: var(--bg-primary);
+  padding: 0 8px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--accent-blue);
+  letter-spacing: 0.05em;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dockerInner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+}
+
+/* Side-by-side layout for infra */
+.infraRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  width: 100%;
+  max-width: 600px;
+}
+
+@media (max-width: 500px) {
+  .infraRow {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Pipeline (keep for simpler inline flows) */
 .pipeline {
   display: flex;
   align-items: center;
@@ -187,41 +406,258 @@
   font-size: 12px;
 }
 
-/* Revision history */
-.revisionHeader {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-muted);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  margin: 0 0 16px;
+/* Panel Cards */
+.panelCard {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-left: 3px solid var(--accent-cyan);
+  padding: 16px 20px;
+  margin-bottom: 12px;
 }
 
-.revisionList {
+.panelName {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 4px;
+}
+
+.panelDataSource {
+  font-family: var(--font-geist-mono), 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--accent-cyan);
+  margin: 0 0 8px;
+  display: block;
+}
+
+.panelDesc {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+/* API Grid */
+.apiGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: 16px 0;
+}
+
+@media (max-width: 640px) {
+  .apiGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.apiCategory {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  padding: 16px;
+}
+
+.apiCategoryTitle {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent-cyan);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin: 0 0 10px;
+}
+
+.apiRouteList {
   list-style: none;
   margin: 0;
   padding: 0;
 }
 
-.revisionItem {
-  border-left: 2px solid var(--border-color);
-  padding: 0 0 20px 16px;
-}
-
-.revisionItem:last-child {
-  padding-bottom: 0;
-}
-
-.revisionDate {
+.apiRoute {
   font-family: var(--font-geist-mono), 'JetBrains Mono', monospace;
-  font-size: 13px;
-  color: var(--accent-cyan);
-  display: block;
-  margin-bottom: 2px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  padding: 3px 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
 }
 
-.revisionDesc {
+.apiRoute span {
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 10px;
+}
+
+/* Tech Stack Table */
+.techTable {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  font-size: 13px;
+}
+
+.techTable th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.techTable td {
+  padding: 8px 12px;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.techTable tbody tr:nth-child(odd) {
+  background: var(--bg-surface);
+}
+
+.techTable td:first-child {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* Code Block */
+.codeBlock {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  padding: 16px;
+  overflow-x: auto;
+  font-family: var(--font-geist-mono), 'JetBrains Mono', monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  margin: 12px 0;
+  white-space: pre;
+}
+
+/* Glossary */
+.glossaryTitle {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 48px 0 8px;
+  padding-top: 32px;
+  border-top: 1px solid var(--border-color);
+}
+
+.glossaryIntro {
   font-size: 14px;
+  color: var(--text-muted);
+  margin: 0 0 24px;
+}
+
+.glossaryList {
+  margin: 0;
+  padding: 0;
+}
+
+.glossaryTerm {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--accent-blue);
+  margin: 0;
+  padding-top: 12px;
+  scroll-margin-top: 60px;
+}
+
+.glossaryDef {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  margin: 4px 0 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+/* Badge Row */
+.badgeRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px 0;
+}
+
+.badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  letter-spacing: 0.03em;
+}
+
+/* Subsection title (smaller than sectionTitle) */
+.subsectionTitle {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 24px 0 8px;
+}
+
+/* Grid AI context layers */
+.contextLayers {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 16px 0;
+}
+
+@media (max-width: 640px) {
+  .contextLayers {
+    grid-template-columns: 1fr;
+  }
+}
+
+.contextLayer {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  padding: 12px 16px;
+}
+
+.contextLayerName {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent-blue);
+  display: block;
+  margin-bottom: 4px;
+}
+
+.contextLayerDesc {
+  font-size: 12px;
   color: var(--text-secondary);
   line-height: 1.5;
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .content {
+    padding: 32px 16px 48px;
+  }
+
+  .pageTitle {
+    font-size: 24px;
+  }
+
+  .sectionTitle {
+    font-size: 18px;
+  }
+
+  .archNode {
+    padding: 10px 14px;
+  }
+
+  .archBranch {
+    grid-template-columns: 1fr;
+  }
+
+  .panelCard {
+    padding: 12px 14px;
+  }
 }
