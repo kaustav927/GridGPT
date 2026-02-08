@@ -43,3 +43,12 @@ htmlcov/
 
 # Claude Code
 .claude/settings.local.json
+
+# Serena MCP (project memory and cache)
+.serena/
+
+# Playwright MCP (testing artifacts)
+.playwright-mcp/
+
+# Development screenshots
+dashboard-*.png
