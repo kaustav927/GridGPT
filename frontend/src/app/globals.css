@@ -20,6 +20,7 @@
   --text-muted: #6E7681;
 }
 
+
 body {
   background: var(--bg-primary);
   color: var(--text-primary);

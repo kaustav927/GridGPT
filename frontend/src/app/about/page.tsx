@@ -692,28 +692,30 @@ export default function AboutPage() {
         {/* Tech Stack */}
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}>Tech Stack</h2>
-          <table className={styles.techTable}>
-            <thead>
-              <tr>
-                <th>Layer</th>
-                <th>Technology</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr><td>Frontend</td><td>Next.js 14 (App Router), Blueprint.js 5.x, Recharts, Nivo, Leaflet</td></tr>
-              <tr><td>Language</td><td>TypeScript (strict), Python 3.11</td></tr>
-              <tr><td>API</td><td>Next.js API routes, Server-Sent Events (SSE)</td></tr>
-              <tr><td>Database</td><td>ClickHouse (columnar OLAP)</td></tr>
-              <tr><td>Streaming</td><td>Redpanda (Kafka-compatible)</td></tr>
-              <tr><td>Cache</td><td>Redis</td></tr>
-              <tr><td>AI</td><td>Claude API (claude-sonnet-4, tool use)</td></tr>
-              <tr><td>Weather</td><td>ECCC GDPS via WMS</td></tr>
-              <tr><td>Maps</td><td>Leaflet + react-leaflet, GeoJSON, WMS tiles</td></tr>
-              <tr><td>Producer</td><td>Python 3.11, aiohttp, confluent-kafka, Pydantic v2</td></tr>
-              <tr><td>Infrastructure</td><td>Docker Compose, Vercel, Hetzner VPS</td></tr>
-              <tr><td>Dev Tools</td><td>Claude Code, Context7, Sequential Thinking</td></tr>
-            </tbody>
-          </table>
+          <div className={styles.tableScroll}>
+            <table className={styles.techTable}>
+              <thead>
+                <tr>
+                  <th>Layer</th>
+                  <th>Technology</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td>Frontend</td><td>Next.js 14 (App Router), Blueprint.js 5.x, Recharts, Nivo, Leaflet</td></tr>
+                <tr><td>Language</td><td>TypeScript (strict), Python 3.11</td></tr>
+                <tr><td>API</td><td>Next.js API routes, Server-Sent Events (SSE)</td></tr>
+                <tr><td>Database</td><td>ClickHouse (columnar OLAP)</td></tr>
+                <tr><td>Streaming</td><td>Redpanda (Kafka-compatible)</td></tr>
+                <tr><td>Cache</td><td>Redis</td></tr>
+                <tr><td>AI</td><td>Claude API (claude-sonnet-4, tool use)</td></tr>
+                <tr><td>Weather</td><td>ECCC GDPS via WMS</td></tr>
+                <tr><td>Maps</td><td>Leaflet + react-leaflet, GeoJSON, WMS tiles</td></tr>
+                <tr><td>Producer</td><td>Python 3.11, aiohttp, confluent-kafka, Pydantic v2</td></tr>
+                <tr><td>Infrastructure</td><td>Docker Compose, Vercel, Hetzner VPS</td></tr>
+                <tr><td>Dev Tools</td><td>Claude Code, Context7, Sequential Thinking</td></tr>
+              </tbody>
+            </table>
+          </div>
         </section>
 
         {/* Quick Start */}
@@ -742,34 +744,36 @@ docker exec -it clickhouse clickhouse-client \\
             reports are freely available and require no authentication.
           </p>
 
-          <table className={styles.dataTable}>
-            <thead>
-              <tr>
-                <th>Report</th>
-                <th>Format</th>
-                <th>Frequency</th>
-                <th>URL</th>
-              </tr>
-            </thead>
-            <tbody>
-              {DATA_SOURCES.map((src) => (
-                <tr key={src.path}>
-                  <td className={styles.mono}>{src.name}</td>
-                  <td>{src.format}</td>
-                  <td>{src.frequency}</td>
-                  <td>
-                    <a
-                      href={`${IESO_BASE}/${src.path}/`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      Link
-                    </a>
-                  </td>
+          <div className={styles.tableScroll}>
+            <table className={styles.dataTable}>
+              <thead>
+                <tr>
+                  <th>Report</th>
+                  <th>Format</th>
+                  <th>Frequency</th>
+                  <th>URL</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {DATA_SOURCES.map((src) => (
+                  <tr key={src.path}>
+                    <td className={styles.mono}>{src.name}</td>
+                    <td>{src.format}</td>
+                    <td>{src.frequency}</td>
+                    <td>
+                      <a
+                        href={`${IESO_BASE}/${src.path}/`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        Link
+                      </a>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </section>
 
         {/* Glossary */}

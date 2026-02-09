@@ -4,6 +4,7 @@
   color: var(--text-primary);
   display: flex;
   flex-direction: column;
+  overflow-x: hidden;
 }
 
 /* Header */
@@ -136,6 +137,12 @@
   color: var(--text-primary);
 }
 
+/* Scrollable table wrapper */
+.tableScroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 /* Architecture Diagram */
 .diagram {
   margin: 24px 0;
@@ -157,7 +164,6 @@
   flex-direction: column;
   align-items: center;
   gap: 0;
-  min-width: 320px;
 }
 
 .archNode {
@@ -165,7 +171,7 @@
   border: 1px solid var(--border-color);
   padding: 12px 20px;
   width: 100%;
-  max-width: 600px;
+  max-width: min(600px, 100%);
   display: flex;
   align-items: center;
   gap: 12px;
@@ -243,7 +249,7 @@
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 8px;
   width: 100%;
-  max-width: 600px;
+  max-width: min(600px, 100%);
 }
 
 .archBranchNode {
@@ -284,7 +290,7 @@
   border: 1px dashed var(--accent-blue);
   padding: 16px;
   width: 100%;
-  max-width: 600px;
+  max-width: min(600px, 100%);
   position: relative;
 }
 
@@ -316,7 +322,7 @@
   grid-template-columns: 1fr 1fr;
   gap: 8px;
   width: 100%;
-  max-width: 600px;
+  max-width: min(600px, 100%);
 }
 
 @media (max-width: 500px) {
@@ -639,6 +645,10 @@
 @media (max-width: 640px) {
   .content {
     padding: 32px 16px 48px;
+  }
+
+  .header {
+    padding: 0 12px;
   }
 
   .pageTitle {
