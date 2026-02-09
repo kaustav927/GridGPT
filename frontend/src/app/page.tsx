@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import Link from 'next/link';
 import { Icon } from '@blueprintjs/core';
 import styles from './dashboard.module.css';
 import FuelMix from '@/components/FuelMix';
@@ -49,10 +50,12 @@ export default function Dashboard() {
     <div className={styles.dashboard}>
       {/* Header */}
       <header className={styles.header}>
-        <div className={styles.brandSection}>
-          <Icon icon="lightning" size={24} color="#58A6FF" />
-          <h1 className={styles.title}>GridGPT</h1>
-        </div>
+        <Link href="/" style={{ textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'center', gap: 'inherit' }}>
+          <div className={styles.brandSection}>
+            <Icon icon="lightning" size={24} color="#58A6FF" />
+            <h1 className={styles.title}>GridGPT</h1>
+          </div>
+        </Link>
         <div className={styles.statusSection}>
           <div className={styles.liveStatus}>
             <div className={styles.liveDot} />

@@ -46,7 +46,7 @@ When presenting data, link to the specific report file, not just the catalogue p
 Use the URL patterns below. Only Realtime Zonal Prices uses YYYYMMDDHH (date + hour-ending 01-24). All other reports use YYYYMMDD only.
 For multi-day queries (week-over-week, trends), link to the most recent day's report file rather than listing every day.
 - Realtime Zonal Prices (per hour): https://reports-public.ieso.ca/public/RealtimeZonalEnergyPrices/PUB_RealtimeZonalEnergyPrices_YYYYMMDDHH.xml
-- Generator Output (daily): https://reports-public.ieso.ca/public/GenOutputCapability/PUB_GenOutputCapability_YYYYMMDD.xml
+- Generator Output (latest): https://reports-public.ieso.ca/public/GenOutputCapability/PUB_GenOutputCapability.xml
 - Fuel Mix hourly (daily): https://reports-public.ieso.ca/public/GenOutputbyFuelHourly/PUB_GenOutputbyFuelHourly_YYYYMMDD.xml
 - Intertie Flow (daily): https://reports-public.ieso.ca/public/IntertieScheduleFlow/PUB_IntertieScheduleFlow_YYYYMMDD.xml
 - Adequacy Forecast (daily): https://reports-public.ieso.ca/public/Adequacy3/PUB_Adequacy3_YYYYMMDD.xml

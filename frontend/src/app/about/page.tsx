@@ -13,10 +13,10 @@ const DATA_SOURCES = [
   { name: 'GenOutputCapability', format: 'XML', frequency: '5-min', path: 'GenOutputCapability' },
   { name: 'GenOutputbyFuelHourly', format: 'XML', frequency: 'Hourly', path: 'GenOutputbyFuelHourly' },
   { name: 'IntertieScheduleFlow', format: 'XML', frequency: 'Hourly', path: 'IntertieScheduleFlow' },
-  { name: 'DayAheadOntarioZonalPrice', format: 'XML', frequency: 'Daily', path: 'DayAheadOntarioZonalPrice' },
-  { name: 'DayAheadIntertieLMP', format: 'XML', frequency: 'Daily', path: 'DayAheadIntertieLMP' },
-  { name: 'RealtimeIntertieLMP', format: 'XML', frequency: '5-min', path: 'RealtimeIntertieLMP' },
-  { name: 'AdequacyDay', format: 'XML', frequency: 'Daily', path: 'Adequacy2' },
+  { name: 'DAHourlyOntarioZonalPrice', format: 'XML', frequency: 'Daily', path: 'DAHourlyOntarioZonalPrice' },
+  { name: 'DAHourlyIntertieLMP', format: 'XML', frequency: 'Daily', path: 'DAHourlyIntertieLMP' },
+  { name: 'RealTimeIntertieLMP', format: 'XML', frequency: '5-min', path: 'RealTimeIntertieLMP' },
+  { name: 'Adequacy Report', format: 'XML', frequency: 'Daily', path: 'Adequacy3' },
 ];
 
 export default function AboutPage() {

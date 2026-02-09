@@ -38,7 +38,7 @@ ${QUERY_PATTERNS}
 - CRITICAL: ClickHouse now() is UTC. For time filters on EST-stored tables, use subtractHours(now(), 5) as the base, e.g. WHERE timestamp > subtractHours(now(), 5) - INTERVAL 1 HOUR. Using bare now() will miss all recent data due to a 5-hour offset.
 - Current delivery hour (hour-ending) = toHour(subtractHours(now(), 5)) + 1. Do NOT confuse this with the hour showing the highest price.
 - When presenting data, include a direct link to the specific IESO report file (with the correct date/hour substituted into the URL pattern from domain knowledge) so users can verify against the official source.
-- Format source links as: "Source: [Report Name](URL)" — link to the exact file, not the catalogue page. Only RT Zonal Prices uses YYYYMMDDHH in the URL; all other reports use YYYYMMDD. For multi-day queries, link to the latest day's report.
+- Format source links as: "Source: [Report Name](URL)" — link to the exact file, not the catalogue page. Only RT Zonal Prices uses YYYYMMDDHH in the URL; all other reports use YYYYMMDD. GenOutputCapability uses an undated URL (PUB_GenOutputCapability.xml, no YYYYMMDD suffix). For multi-day queries, link to the latest day's report.
 - For price questions ("what's the price?", "how much?", daily/hourly comparisons), use DA-OZP (v_da_ozp) as the primary settlement price — NOT averaged RT 5-minute prices.
 - Use RT 5-minute prices (v_zonal_prices) only for: real-time snapshots, congestion monitoring, spike detection, and DA-vs-RT spread analysis.
 - When reporting RT spikes, always note that these are 5-minute monitoring prices, not settlement prices, and mention the corresponding DA-OZP for context.

@@ -4,13 +4,13 @@ import styles from './Footer.module.css';
 export default function Footer() {
   return (
     <footer className={styles.footer}>
-      <span className={styles.brand}>gridGPT.ca</span>
+      <Link href="/" className={styles.brandLink}><span className={styles.brand}>GridGPT</span></Link>
       <span className={styles.author}>Made by Kaustav Sharma</span>
       <nav className={styles.nav}>
         <Link href="/about" className={styles.navLink}>About</Link>
         <span className={styles.navSep}>&middot;</span>
         <a
-          href="https://github.com/kaustav927/OntarioGridCockpit"
+          href="https://github.com/kaustav927/GridGPT"
           target="_blank"
           rel="noopener noreferrer"
           className={styles.navLink}

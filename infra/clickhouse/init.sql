@@ -342,7 +342,7 @@ FROM ieso.da_ozp
 GROUP BY delivery_date, delivery_hour, zone;
 
 CREATE VIEW IF NOT EXISTS ieso.v_weather AS
-SELECT timestamp, zone,
+SELECT valid_timestamp, zone,
   avg(lat) AS lat,
   avg(lng) AS lng,
   avg(temperature) AS temperature,
@@ -350,4 +350,4 @@ SELECT timestamp, zone,
   avg(wind_direction) AS wind_direction,
   avg(cloud_cover) AS cloud_cover
 FROM ieso.weather
-GROUP BY timestamp, zone;
+GROUP BY valid_timestamp, zone;

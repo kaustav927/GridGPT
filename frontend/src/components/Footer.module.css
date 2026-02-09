@@ -1,20 +1,28 @@
 .footer {
-  height: 40px;
   background: var(--bg-primary);
   border-top: 1px solid var(--border-color);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 24px;
+  padding: 20px 24px;
   flex-shrink: 0;
   position: relative;
   z-index: 10;
 }
 
 .brand {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text-secondary);
   font-family: var(--font-geist-mono), 'JetBrains Mono', monospace;
+}
+
+.brandLink {
+  color: inherit;
+  text-decoration: none;
+}
+
+.brandLink:hover {
+  color: var(--accent-blue);
 }
 
 .author {
@@ -44,8 +52,14 @@
   font-size: 12px;
 }
 
+@media (min-width: 901px) {
+  .brand { font-size: 16px; }
+  .nav { font-size: 15px; }
+  .author { font-size: 13px; }
+}
+
 @media (max-width: 900px) {
-  .footer { height: 44px; padding: 0 12px; }
+  .footer { padding: 12px; }
   .brand { font-size: 11px; }
   .author { display: block; font-size: 10px; }
   .nav { font-size: 11px; gap: 6px; }
