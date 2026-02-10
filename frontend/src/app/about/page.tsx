@@ -271,7 +271,7 @@ export default function AboutPage() {
                 </div>
                 <div className={`${styles.archBranchNode} ${styles.nodeFrontend}`}>
                   <span className={styles.archBranchName}>Interties</span>
-                  <span className={styles.archBranchDesc}>Flow table + carbon</span>
+                  <span className={styles.archBranchDesc}>Flow table</span>
                 </div>
               </div>
             </div>

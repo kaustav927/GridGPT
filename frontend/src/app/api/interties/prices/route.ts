@@ -80,7 +80,7 @@ export async function GET() {
   } catch (error) {
     console.error('ClickHouse error:', error);
     return NextResponse.json(
-      { error: 'Database error', message: error instanceof Error ? error.message : 'Unknown error' },
+      { error: 'Database error', message: 'Internal server error' },
       { status: 500 }
     );
   }

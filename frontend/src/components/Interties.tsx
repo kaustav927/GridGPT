@@ -126,39 +126,22 @@ export default function Interties() {
         })}
       </div>
 
-      {/* Summary row: Net Flow + Carbon */}
+      {/* Summary row: Net Flow */}
       <div style={{
-        display: 'flex',
         borderTop: '1px solid #30363D',
         marginTop: '12px',
         paddingTop: '12px',
-        gap: '16px'
       }}>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: '10px', color: '#8B949E', marginBottom: '4px' }}>
-            NET FLOW
-          </div>
-          <div style={{
-            fontSize: '16px',
-            fontWeight: 600,
-            fontVariantNumeric: 'tabular-nums',
-            color: !hasNetFlow ? '#8B949E' : netFlow >= 0 ? '#3FB950' : '#F85149'
-          }}>
-            {hasNetFlow ? (netFlow >= 0 ? '+' : '') : ''}{Math.round(netFlow)} MW
-          </div>
+        <div style={{ fontSize: '10px', color: '#8B949E', marginBottom: '4px' }}>
+          NET FLOW
         </div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: '10px', color: '#8B949E', marginBottom: '4px' }}>
-            CARBON
-          </div>
-          <div style={{
-            fontSize: '16px',
-            fontWeight: 600,
-            fontVariantNumeric: 'tabular-nums',
-            color: '#8B949E'
-          }}>
-            28 gCO₂/kWh
-          </div>
+        <div style={{
+          fontSize: '16px',
+          fontWeight: 600,
+          fontVariantNumeric: 'tabular-nums',
+          color: !hasNetFlow ? '#8B949E' : netFlow >= 0 ? '#3FB950' : '#F85149'
+        }}>
+          {hasNetFlow ? (netFlow >= 0 ? '+' : '') : ''}{Math.round(netFlow)} MW
         </div>
       </div>
     </>
