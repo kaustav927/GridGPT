@@ -196,4 +196,10 @@
     font-size: 12px;
     padding: 3px 8px;
   }
+
+  .card.collapsed {
+    height: auto !important;
+    max-height: none !important;
+    flex: 0 0 auto !important;
+  }
 }

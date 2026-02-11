@@ -1,30 +1,34 @@
-'use client';
+"use client";
 
-import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
-import { Icon } from '@blueprintjs/core';
-import styles from './Card.module.css';
-import ontarioZones from '@/data/ontario-zones.geojson';
-import { GENERATION_SITES, FUEL_COLORS } from '@/data/generation-sites';
-import { TRANSMISSION_IMAGE_URL, TRANSMISSION_BOUNDS, INTERTIES } from '@/data/transmission-lines';
-import type { ZoneData, WeatherDataMap, WeatherData } from '@/lib/types';
-import Tooltip from './Tooltip';
-import TimeScrubber from './TimeScrubber';
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
+import { Icon } from "@blueprintjs/core";
+import styles from "./Card.module.css";
+import ontarioZones from "@/data/ontario-zones.geojson";
+import { GENERATION_SITES, FUEL_COLORS } from "@/data/generation-sites";
+import {
+  TRANSMISSION_IMAGE_URL,
+  TRANSMISSION_BOUNDS,
+  INTERTIES,
+} from "@/data/transmission-lines";
+import type { ZoneData, WeatherDataMap, WeatherData } from "@/lib/types";
+import Tooltip from "./Tooltip";
+import TimeScrubber from "./TimeScrubber";
 
 // Price-to-color mapping for zone coloring (IESO-aligned 12-tier scale)
 const priceToColor = (price: number | null | undefined): string => {
-  if (price === null || price === undefined) return '#888888'; // Undefined
-  if (price < -2000) return '#1E5AA8';  // < -$2,000 (dark blue)
-  if (price < -100) return '#4A90D9';   // < -$100 (blue)
-  if (price < -16) return '#7FE5E5';    // < -$16 (cyan)
-  if (price < -4) return '#D4F5D4';     // < -$4 (light green)
-  if (price < 0) return '#FFF8D6';      // < $0 (pale yellow)
-  if (price < 10) return '#FCE88C';     // < $10 (light yellow)
-  if (price < 30) return '#F8D14F';     // < $30 (yellow)
-  if (price < 60) return '#F5A623';     // < $60 (light orange)
-  if (price < 100) return '#E07830';    // < $100 (orange)
-  if (price < 400) return '#C83C23';    // < $400 (red)
-  if (price < 1200) return '#8B2913';   // < $1,200 (darker red)
-  return '#5C1A0B';                     // >= $1,200 (dark brown)
+  if (price === null || price === undefined) return "#888888"; // Undefined
+  if (price < -2000) return "#1E5AA8"; // < -$2,000 (dark blue)
+  if (price < -100) return "#4A90D9"; // < -$100 (blue)
+  if (price < -16) return "#7FE5E5"; // < -$16 (cyan)
+  if (price < -4) return "#D4F5D4"; // < -$4 (light green)
+  if (price < 0) return "#FFF8D6"; // < $0 (pale yellow)
+  if (price < 10) return "#FCE88C"; // < $10 (light yellow)
+  if (price < 30) return "#F8D14F"; // < $30 (yellow)
+  if (price < 60) return "#F5A623"; // < $60 (light orange)
+  if (price < 100) return "#E07830"; // < $100 (orange)
+  if (price < 400) return "#C83C23"; // < $400 (red)
+  if (price < 1200) return "#8B2913"; // < $1,200 (darker red)
+  return "#5C1A0B"; // >= $1,200 (dark brown)
 };
 
 const priceToOpacity = (price: number): number => {
@@ -36,13 +40,13 @@ const priceToOpacity = (price: number): number => {
 
 // Temperature to color (cold blue → hot red)
 const tempToColor = (celsius: number): string => {
-  if (celsius < -20) return '#1E5AA8';  // Deep cold (dark blue)
-  if (celsius < -10) return '#4A90D9';  // Very cold (blue)
-  if (celsius < 0) return '#7FE5E5';    // Cold (cyan)
-  if (celsius < 10) return '#A8E6CF';   // Cool (light green)
-  if (celsius < 20) return '#FCE88C';   // Mild (yellow)
-  if (celsius < 30) return '#F5A623';   // Warm (orange)
-  return '#C83C23';                     // Hot (red)
+  if (celsius < -20) return "#1E5AA8"; // Deep cold (dark blue)
+  if (celsius < -10) return "#4A90D9"; // Very cold (blue)
+  if (celsius < 0) return "#7FE5E5"; // Cold (cyan)
+  if (celsius < 10) return "#A8E6CF"; // Cool (light green)
+  if (celsius < 20) return "#FCE88C"; // Mild (yellow)
+  if (celsius < 30) return "#F5A623"; // Warm (orange)
+  return "#C83C23"; // Hot (red)
 };
 
 // Snap time to nearest hour (intertie data is hourly granularity)
@@ -54,7 +58,12 @@ const snapToHour = (date: Date | null): string | null => {
 };
 
 // Compute bearing between two lat/lng points (degrees)
-const getBearing = (lat0: number, lng0: number, lat1: number, lng1: number): number => {
+const getBearing = (
+  lat0: number,
+  lng0: number,
+  lat1: number,
+  lng1: number,
+): number => {
   const dLng = lng1 - lng0;
   const dLat = lat1 - lat0;
   return Math.atan2(dLng, dLat) * (180 / Math.PI);
@@ -68,7 +77,7 @@ const snapToGdpsTime = (date: Date | null): string | undefined => {
   const hours = d.getUTCHours();
   const snappedHour = Math.round(hours / 3) * 3;
   d.setUTCHours(snappedHour, 0, 0, 0);
-  return d.toISOString().split('.')[0] + 'Z';
+  return d.toISOString().split(".")[0] + "Z";
 };
 
 interface ZonePriceMap {
@@ -115,8 +124,23 @@ function MapContent({
   // Transmission layer split: base (static) + chevrons (dynamic) + animation (independent)
   const transmissionBaseLayerRef = useRef<L.LayerGroup | null>(null);
   const transmissionChevronLayerRef = useRef<L.LayerGroup | null>(null);
-  const chevronMarkersRef = useRef<{ marker: L.Marker; from: [number, number]; to: [number, number]; offset: number }[]>([]);
-  const intertieFlowCacheRef = useRef<Map<string, { data: Record<string, { mw: number; lastUpdated: string }>; fetchedAt: number }>>(new Map());
+  const chevronMarkersRef = useRef<
+    {
+      marker: L.Marker;
+      from: [number, number];
+      to: [number, number];
+      offset: number;
+    }[]
+  >([]);
+  const intertieFlowCacheRef = useRef<
+    Map<
+      string,
+      {
+        data: Record<string, { mw: number; lastUpdated: string }>;
+        fetchedAt: number;
+      }
+    >
+  >(new Map());
   const lastIntertieHourRef = useRef<string | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const polylineRefsRef = useRef<Map<string, any>>(new Map());
@@ -137,29 +161,29 @@ function MapContent({
   const [mapReady, setMapReady] = useState(false);
 
   useEffect(() => {
-    if (typeof window === 'undefined' || !containerRef.current) return;
+    if (typeof window === "undefined" || !containerRef.current) return;
 
     // Dynamically import Leaflet
     const initMap = async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const L = (await import('leaflet')) as any;
+      const L = (await import("leaflet")) as any;
 
       // Add Leaflet CSS
       if (!document.querySelector('link[href*="leaflet.css"]')) {
-        const link = document.createElement('link');
-        link.rel = 'stylesheet';
-        link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+        const link = document.createElement("link");
+        link.rel = "stylesheet";
+        link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
         document.head.appendChild(link);
       }
 
       // Wait for container to be ready
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       if (!containerRef.current || mapRef.current) return;
 
       // Create map
       const map = L.map(containerRef.current, {
-        center: [49.5, -84.5],
+        center: [45.5, -84.5],
         zoom: 6,
         scrollWheelZoom: true,
         zoomControl: true,
@@ -168,16 +192,21 @@ function MapContent({
       mapRef.current = map;
 
       // Add dark tile layer
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
-      }).addTo(map);
+      L.tileLayer(
+        "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+        {
+          attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
+        },
+      ).addTo(map);
 
       // Compute Ontario bounds from GeoJSON for initial view (without adding the layer)
       const boundsLayer = L.geoJSON(ontarioZones as GeoJSON.FeatureCollection);
-      // More padding on small screens so zones aren't cut off at edges
+      // Asymmetric padding: more on bottom so southern Ontario isn't cut off by time scrubber
       const isMobile = window.innerWidth <= 900;
-      const fitPadding: [number, number] = isMobile ? [30, 20] : [10, 10];
-      map.fitBounds(boundsLayer.getBounds(), { padding: fitPadding });
+      map.fitBounds(boundsLayer.getBounds(), {
+        paddingTopLeft: isMobile ? [40, 30] : [10, 10],
+        paddingBottomRight: isMobile ? [40, 120] : [10, 60],
+      });
 
       // Signal that map is ready for layers
       setMapReady(true);
@@ -211,68 +240,71 @@ function MapContent({
 
     const loadLayer = async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const L = (await import('leaflet')) as any;
+      const L = (await import("leaflet")) as any;
 
-      const geojsonLayer = L.geoJSON(ontarioZones as GeoJSON.FeatureCollection, {
-        style: (feature: GeoJSON.Feature | undefined) => {
-          if (!feature?.properties?.zone) {
+      const geojsonLayer = L.geoJSON(
+        ontarioZones as GeoJSON.FeatureCollection,
+        {
+          style: (feature: GeoJSON.Feature | undefined) => {
+            if (!feature?.properties?.zone) {
+              return {
+                fillColor: "#30363D",
+                fillOpacity: 0.1,
+                color: "#30363D",
+                weight: 1,
+              };
+            }
+
+            const zone = feature.properties.zone;
+            const zoneData = zonePricesRef.current[zone];
+            const price = zoneData?.price || 0;
+            const isSelected = zone === selectedZoneRef.current;
+
             return {
-              fillColor: '#30363D',
-              fillOpacity: 0.1,
-              color: '#30363D',
-              weight: 1,
+              fillColor: priceToColor(price),
+              fillOpacity: isSelected ? 0.5 : priceToOpacity(price),
+              color: isSelected ? "#58A6FF" : "#30363D",
+              weight: isSelected ? 2 : 1,
+              className: isSelected ? "zone-selected" : "",
             };
-          }
+          },
+          onEachFeature: (feature: GeoJSON.Feature, layer: L.Layer) => {
+            const zone = feature.properties?.zone;
+            if (!zone) return;
 
-          const zone = feature.properties.zone;
-          const zoneData = zonePricesRef.current[zone];
-          const price = zoneData?.price || 0;
-          const isSelected = zone === selectedZoneRef.current;
+            const zoneData = zonePricesRef.current[zone];
 
-          return {
-            fillColor: priceToColor(price),
-            fillOpacity: isSelected ? 0.5 : priceToOpacity(price),
-            color: isSelected ? '#58A6FF' : '#30363D',
-            weight: isSelected ? 2 : 1,
-            className: isSelected ? 'zone-selected' : '',
-          };
-        },
-        onEachFeature: (feature: GeoJSON.Feature, layer: L.Layer) => {
-          const zone = feature.properties?.zone;
-          if (!zone) return;
-
-          const zoneData = zonePricesRef.current[zone];
-
-          const tooltipContent = `
+            const tooltipContent = `
             <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 8px; background: #161B22; border: 1px solid #30363D;">
               <div style="font-weight: 600; color: #E6EDF3; margin-bottom: 4px;">${feature.properties?.name || zone}</div>
-              <div style="color: #D29922;">Price: $${zoneData?.price?.toFixed(2) || 'N/A'}/MWh</div>
+              <div style="color: #D29922;">Price: $${zoneData?.price?.toFixed(2) || "N/A"}/MWh</div>
             </div>
           `;
 
-          layer.bindTooltip(tooltipContent, {
-            permanent: false,
-            direction: 'auto',
-            className: 'zone-tooltip',
-          });
+            layer.bindTooltip(tooltipContent, {
+              permanent: false,
+              direction: "auto",
+              className: "zone-tooltip",
+            });
 
-          layer.on('click', () => {
-            if (onZoneSelect) {
-              onZoneSelect(zone === selectedZoneRef.current ? null : zone);
-            }
-          });
+            layer.on("click", () => {
+              if (onZoneSelect) {
+                onZoneSelect(zone === selectedZoneRef.current ? null : zone);
+              }
+            });
 
-          layer.on('mouseover', () => {
-            const el = (layer as L.Path).getElement?.();
-            if (el) el.classList.add('zone-hover');
-          });
+            layer.on("mouseover", () => {
+              const el = (layer as L.Path).getElement?.();
+              if (el) el.classList.add("zone-hover");
+            });
 
-          layer.on('mouseout', () => {
-            const el = (layer as L.Path).getElement?.();
-            if (el) el.classList.remove('zone-hover');
-          });
+            layer.on("mouseout", () => {
+              const el = (layer as L.Path).getElement?.();
+              if (el) el.classList.remove("zone-hover");
+            });
+          },
         },
-      });
+      );
 
       geojsonLayer.addTo(map);
       pricingLayerRef.current = geojsonLayer;
@@ -293,9 +325,9 @@ function MapContent({
     pricingLayerRef.current.setStyle((feature: GeoJSON.Feature | undefined) => {
       if (!feature?.properties?.zone) {
         return {
-          fillColor: '#30363D',
+          fillColor: "#30363D",
           fillOpacity: 0.1,
-          color: '#30363D',
+          color: "#30363D",
           weight: 1,
         };
       }
@@ -308,9 +340,9 @@ function MapContent({
       return {
         fillColor: priceToColor(price),
         fillOpacity: isSelected ? 0.5 : priceToOpacity(price),
-        color: isSelected ? '#58A6FF' : '#30363D',
+        color: isSelected ? "#58A6FF" : "#30363D",
         weight: isSelected ? 2 : 1,
-        className: isSelected ? 'zone-selected' : '',
+        className: isSelected ? "zone-selected" : "",
       };
     });
 
@@ -325,7 +357,7 @@ function MapContent({
       layer.setTooltipContent(`
         <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 8px; background: #161B22; border: 1px solid #30363D;">
           <div style="font-weight: 600; color: #E6EDF3; margin-bottom: 4px;">${feature?.properties?.name || zone}</div>
-          <div style="color: #D29922;">Price: $${zoneData?.price?.toFixed(2) || 'N/A'}/MWh</div>
+          <div style="color: #D29922;">Price: $${zoneData?.price?.toFixed(2) || "N/A"}/MWh</div>
         </div>
       `);
     });
@@ -346,14 +378,14 @@ function MapContent({
 
     const loadLayer = async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const L = (await import('leaflet')) as any;
+      const L = (await import("leaflet")) as any;
 
       const markers = GENERATION_SITES.map((site) =>
         L.circleMarker([site.lat, site.lng], {
           radius: 5,
           fillColor: FUEL_COLORS[site.fuelType],
           fillOpacity: 0.85,
-          color: '#0D1117',
+          color: "#0D1117",
           weight: 1,
         }).bindTooltip(
           `<div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 8px; background: #161B22; border: 1px solid #30363D;">
@@ -363,8 +395,8 @@ function MapContent({
               <span style="color: ${FUEL_COLORS[site.fuelType]}; text-transform: capitalize;">${site.fuelType}</span>
             </div>
           </div>`,
-          { direction: 'auto', className: 'zone-tooltip' }
-        )
+          { direction: "auto", className: "zone-tooltip" },
+        ),
       );
 
       const layerGroup = L.layerGroup(markers);
@@ -398,33 +430,40 @@ function MapContent({
 
     const loadBaseLayer = async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const L = (await import('leaflet')) as any;
+      const L = (await import("leaflet")) as any;
 
       const layers: L.Layer[] = [];
 
       // Add IESO transmission image overlay
-      const imageOverlay = L.imageOverlay(TRANSMISSION_IMAGE_URL, TRANSMISSION_BOUNDS, {
-        opacity: 0.85,
-        interactive: false,
-      });
+      const imageOverlay = L.imageOverlay(
+        TRANSMISSION_IMAGE_URL,
+        TRANSMISSION_BOUNDS,
+        {
+          opacity: 0.85,
+          interactive: false,
+        },
+      );
       layers.push(imageOverlay);
 
       // Add 8 intertie polylines with default "no data" styling
       INTERTIES.forEach((intertie) => {
         const polyline = L.polyline(intertie.path, {
-          color: '#F0883E',
+          color: "#F0883E",
           weight: 3,
           opacity: 0.5,
-          dashArray: '8, 6',
+          dashArray: "8, 6",
         }).bindTooltip(
           `<div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 8px; background: #161B22; border: 1px solid #30363D;">
             <div style="font-weight: 600; color: #E6EDF3; margin-bottom: 4px;">${intertie.name}</div>
             <div style="color: #8B949E; font-weight: 600;">NO FLOW</div>
           </div>`,
-          { direction: 'auto', className: 'zone-tooltip', sticky: true }
+          { direction: "auto", className: "zone-tooltip", sticky: true },
         );
         layers.push(polyline);
-        polylineRefsRef.current.set(intertie.flowKey + ':' + intertie.name, polyline);
+        polylineRefsRef.current.set(
+          intertie.flowKey + ":" + intertie.name,
+          polyline,
+        );
       });
 
       const layerGroup = L.layerGroup(layers);
@@ -436,40 +475,45 @@ function MapContent({
   }, [mapReady, showTransmission]);
 
   // Rebuild chevron markers from flow data (called by Effect B after data fetch)
-  const rebuildChevrons = useCallback(async (
-    flowByGroup: Record<string, { mw: number; lastUpdated: string }>,
-    map: L.Map
-  ) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const L = (await import('leaflet')) as any;
+  const rebuildChevrons = useCallback(
+    async (
+      flowByGroup: Record<string, { mw: number; lastUpdated: string }>,
+      map: L.Map,
+    ) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const L = (await import("leaflet")) as any;
 
-    // Remove ONLY the chevron layer, not the base layer
-    if (transmissionChevronLayerRef.current) {
-      map.removeLayer(transmissionChevronLayerRef.current);
-      transmissionChevronLayerRef.current = null;
-    }
+      // Remove ONLY the chevron layer, not the base layer
+      if (transmissionChevronLayerRef.current) {
+        map.removeLayer(transmissionChevronLayerRef.current);
+        transmissionChevronLayerRef.current = null;
+      }
 
-    const chevronLayers: L.Layer[] = [];
-    const newChevrons: typeof chevronMarkersRef.current = [];
+      const chevronLayers: L.Layer[] = [];
+      const newChevrons: typeof chevronMarkersRef.current = [];
 
-    INTERTIES.forEach((intertie) => {
-      const entry = flowByGroup[intertie.flowKey];
-      const mw = entry?.mw ?? 0;
-      const isExport = mw > 0;
-      const hasFlow = Math.abs(mw) > 1;
+      INTERTIES.forEach((intertie) => {
+        const entry = flowByGroup[intertie.flowKey];
+        const mw = entry?.mw ?? 0;
+        const isExport = mw > 0;
+        const hasFlow = Math.abs(mw) > 1;
 
-      if (!hasFlow) return;
+        if (!hasFlow) return;
 
-      // path[0] = Ontario side, path[1] = external side
-      const from: [number, number] = isExport ? intertie.path[0] : intertie.path[1];
-      const to: [number, number] = isExport ? intertie.path[1] : intertie.path[0];
-      const bearing = getBearing(from[0], from[1], to[0], to[1]);
-      const chevronColor = isExport ? '#3FB950' : '#F85149';
+        // path[0] = Ontario side, path[1] = external side
+        const from: [number, number] = isExport
+          ? intertie.path[0]
+          : intertie.path[1];
+        const to: [number, number] = isExport
+          ? intertie.path[1]
+          : intertie.path[0];
+        const bearing = getBearing(from[0], from[1], to[0], to[1]);
+        const chevronColor = isExport ? "#3FB950" : "#F85149";
 
-      // Create 3 staggered chevrons per line
-      for (let i = 0; i < 3; i++) {
-        const icon = L.divIcon({
-          html: `<span style="
+        // Create 3 staggered chevrons per line
+        for (let i = 0; i < 3; i++) {
+          const icon = L.divIcon({
+            html: `<span style="
             font-size: 16px;
             font-weight: bold;
             color: ${chevronColor};
@@ -479,30 +523,32 @@ function MapContent({
             pointer-events: none;
             line-height: 1;
           ">&rsaquo;&rsaquo;&rsaquo;</span>`,
-          className: '',
-          iconSize: [20, 20],
-          iconAnchor: [10, 10],
-        });
+            className: "",
+            iconSize: [20, 20],
+            iconAnchor: [10, 10],
+          });
 
-        const marker = L.marker(from, {
-          icon,
-          interactive: false,
-          keyboard: false,
-        });
-        chevronLayers.push(marker);
-        newChevrons.push({ marker, from, to, offset: i / 3 });
+          const marker = L.marker(from, {
+            icon,
+            interactive: false,
+            keyboard: false,
+          });
+          chevronLayers.push(marker);
+          newChevrons.push({ marker, from, to, offset: i / 3 });
+        }
+      });
+
+      if (chevronLayers.length > 0) {
+        const chevronGroup = L.layerGroup(chevronLayers);
+        chevronGroup.addTo(map);
+        transmissionChevronLayerRef.current = chevronGroup;
       }
-    });
 
-    if (chevronLayers.length > 0) {
-      const chevronGroup = L.layerGroup(chevronLayers);
-      chevronGroup.addTo(map);
-      transmissionChevronLayerRef.current = chevronGroup;
-    }
-
-    // Update shared ref — animation loop automatically picks up new markers
-    chevronMarkersRef.current = newChevrons;
-  }, []);
+      // Update shared ref — animation loop automatically picks up new markers
+      chevronMarkersRef.current = newChevrons;
+    },
+    [],
+  );
 
   // Effect B — Flow data fetch (decoupled from rendering, snap-to-hour skip logic)
   useEffect(() => {
@@ -510,9 +556,13 @@ function MapContent({
     const map = mapRef.current;
 
     // Update polyline styles and tooltips in-place via setStyle() and setTooltipContent()
-    const updatePolylineStyles = (flowByGroup: Record<string, { mw: number; lastUpdated: string }>) => {
+    const updatePolylineStyles = (
+      flowByGroup: Record<string, { mw: number; lastUpdated: string }>,
+    ) => {
       INTERTIES.forEach((intertie) => {
-        const polyline = polylineRefsRef.current.get(intertie.flowKey + ':' + intertie.name);
+        const polyline = polylineRefsRef.current.get(
+          intertie.flowKey + ":" + intertie.name,
+        );
         if (!polyline) return;
 
         const entry = flowByGroup[intertie.flowKey];
@@ -520,27 +570,43 @@ function MapContent({
         const isExport = mw > 0;
         const hasFlow = Math.abs(mw) > 1;
 
-        const lineColor = hasFlow ? (isExport ? '#3FB950' : '#F85149') : '#F0883E';
-        const dirLabel = hasFlow ? (isExport ? 'EXPORT' : 'IMPORT') : 'NO FLOW';
-        const dirColor = hasFlow ? (isExport ? '#3FB950' : '#F85149') : '#8B949E';
+        const lineColor = hasFlow
+          ? isExport
+            ? "#3FB950"
+            : "#F85149"
+          : "#F0883E";
+        const dirLabel = hasFlow ? (isExport ? "EXPORT" : "IMPORT") : "NO FLOW";
+        const dirColor = hasFlow
+          ? isExport
+            ? "#3FB950"
+            : "#F85149"
+          : "#8B949E";
 
         const asOf = entry?.lastUpdated
-          ? new Date(entry.lastUpdated.replace(' ', 'T') + 'Z')
-              .toLocaleString(undefined, { timeZone: 'America/Toronto', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
-          : '';
+          ? new Date(entry.lastUpdated.replace(" ", "T") + "Z").toLocaleString(
+              undefined,
+              {
+                timeZone: "America/Toronto",
+                month: "short",
+                day: "numeric",
+                hour: "numeric",
+                minute: "2-digit",
+              },
+            )
+          : "";
 
         polyline.setStyle({
           color: lineColor,
           opacity: hasFlow ? 0.9 : 0.5,
-          dashArray: hasFlow ? undefined : '8, 6',
+          dashArray: hasFlow ? undefined : "8, 6",
         });
 
         polyline.setTooltipContent(
           `<div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 8px; background: #161B22; border: 1px solid #30363D;">
             <div style="font-weight: 600; color: #E6EDF3; margin-bottom: 4px;">${intertie.name}</div>
-            <div style="color: ${dirColor}; font-weight: 600;">${dirLabel} ${hasFlow ? Math.abs(mw).toFixed(0) + ' MW' : ''}</div>
-            ${asOf ? `<div style="color: #8B949E; font-size: 10px; margin-top: 4px;">as of ${asOf}</div>` : ''}
-          </div>`
+            <div style="color: ${dirColor}; font-weight: 600;">${dirLabel} ${hasFlow ? Math.abs(mw).toFixed(0) + " MW" : ""}</div>
+            ${asOf ? `<div style="color: #8B949E; font-size: 10px; margin-top: 4px;">as of ${asOf}</div>` : ""}
+          </div>`,
         );
       });
     };
@@ -553,7 +619,7 @@ function MapContent({
     lastIntertieHourRef.current = snappedHour;
 
     // Check cache (60s TTL)
-    const cacheKey = snappedHour || 'current';
+    const cacheKey = snappedHour || "current";
     const cached = intertieFlowCacheRef.current.get(cacheKey);
     if (cached && Date.now() - cached.fetchedAt < 60000) {
       // Use cached data: update polyline styles in-place + rebuild chevrons
@@ -564,16 +630,20 @@ function MapContent({
 
     // Fetch fresh data
     const fetchFlowData = async () => {
-      const flowByGroup: Record<string, { mw: number; lastUpdated: string }> = {};
+      const flowByGroup: Record<string, { mw: number; lastUpdated: string }> =
+        {};
       try {
         const url = scrubTime
           ? `/api/interties/at-time?timestamp=${scrubTime.toISOString()}`
-          : '/api/interties';
+          : "/api/interties";
         const res = await fetch(url);
         if (res.ok) {
           const json = await res.json();
           for (const row of json.data) {
-            flowByGroup[row.flow_group] = { mw: row.mw ?? row.actual_mw ?? 0, lastUpdated: row.last_updated };
+            flowByGroup[row.flow_group] = {
+              mw: row.mw ?? row.actual_mw ?? 0,
+              lastUpdated: row.last_updated,
+            };
           }
         }
       } catch {
@@ -581,7 +651,10 @@ function MapContent({
       }
 
       // Cache the result
-      intertieFlowCacheRef.current.set(cacheKey, { data: flowByGroup, fetchedAt: Date.now() });
+      intertieFlowCacheRef.current.set(cacheKey, {
+        data: flowByGroup,
+        fetchedAt: Date.now(),
+      });
 
       // Update polyline styles in-place (no layer destruction)
       updatePolylineStyles(flowByGroup);
@@ -614,7 +687,7 @@ function MapContent({
       const markers = chevronMarkersRef.current;
 
       for (const chev of markers) {
-        const t = ((elapsed / cycleDuration) + chev.offset) % 1;
+        const t = (elapsed / cycleDuration + chev.offset) % 1;
 
         // Interpolate position
         const lat = chev.from[0] + t * (chev.to[0] - chev.from[0]);
@@ -674,14 +747,14 @@ function MapContent({
 
     const updateLayer = async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const L = (await import('leaflet')) as any;
+      const L = (await import("leaflet")) as any;
 
       // Store old layer ref BEFORE creating new one
       const oldLayer = tempWmsLayerRef.current;
 
       const wmsOptions: Record<string, unknown> = {
-        layers: 'GDPS.ETA_TT',
-        format: 'image/png',
+        layers: "GDPS.ETA_TT",
+        format: "image/png",
         transparent: true,
         opacity: 0.5, // Start at target opacity (no fade to avoid race conditions)
         attribution: '&copy; <a href="https://weather.gc.ca/">ECCC</a>',
@@ -691,7 +764,10 @@ function MapContent({
       }
 
       // Create new layer and add to map
-      const newLayer = L.tileLayer.wms('https://geo.weather.gc.ca/geomet', wmsOptions);
+      const newLayer = L.tileLayer.wms(
+        "https://geo.weather.gc.ca/geomet",
+        wmsOptions,
+      );
       newLayer.setZIndex(100);
       newLayer.addTo(map);
       tempWmsLayerRef.current = newLayer;
@@ -721,12 +797,13 @@ function MapContent({
 
     const loadMarkers = async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const L = (await import('leaflet')) as any;
+      const L = (await import("leaflet")) as any;
 
       const markers: L.Marker[] = [];
       Object.entries(weatherData).forEach(([zone, data]) => {
-        const feature = (ontarioZones as GeoJSON.FeatureCollection).features
-          .find(f => f.properties?.zone === zone);
+        const feature = (
+          ontarioZones as GeoJSON.FeatureCollection
+        ).features.find((f) => f.properties?.zone === zone);
         if (!feature) return;
 
         const bounds = L.geoJSON(feature).getBounds();
@@ -746,12 +823,15 @@ function MapContent({
               white-space: nowrap;
             ">${data.temperature.toFixed(0)}°</div>
           `,
-          className: '',
+          className: "",
           iconSize: [40, 20],
           iconAnchor: [20, 10],
         });
 
-        const marker = L.marker([center.lat, center.lng], { icon, interactive: false });
+        const marker = L.marker([center.lat, center.lng], {
+          icon,
+          interactive: false,
+        });
         markers.push(marker);
       });
 
@@ -794,14 +874,14 @@ function MapContent({
 
     const updateLayer = async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const L = (await import('leaflet')) as any;
+      const L = (await import("leaflet")) as any;
 
       // Store old layer ref BEFORE creating new one
       const oldLayer = cloudWmsLayerRef.current;
 
       const wmsOptions: Record<string, unknown> = {
-        layers: 'GDPS.ETA_NT',
-        format: 'image/png',
+        layers: "GDPS.ETA_NT",
+        format: "image/png",
         transparent: true,
         opacity: 0.5, // Start at target opacity (no fade to avoid race conditions)
         attribution: '&copy; <a href="https://weather.gc.ca/">ECCC</a>',
@@ -811,7 +891,10 @@ function MapContent({
       }
 
       // Create new layer and add to map
-      const newLayer = L.tileLayer.wms('https://geo.weather.gc.ca/geomet', wmsOptions);
+      const newLayer = L.tileLayer.wms(
+        "https://geo.weather.gc.ca/geomet",
+        wmsOptions,
+      );
       newLayer.setZIndex(90);
       newLayer.addTo(map);
       cloudWmsLayerRef.current = newLayer;
@@ -840,20 +923,26 @@ function MapContent({
 
     const loadMarkers = async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const L = (await import('leaflet')) as any;
+      const L = (await import("leaflet")) as any;
 
       const markers: L.Marker[] = [];
       Object.entries(weatherData).forEach(([zone, data]) => {
-        const feature = (ontarioZones as GeoJSON.FeatureCollection).features
-          .find(f => f.properties?.zone === zone);
+        const feature = (
+          ontarioZones as GeoJSON.FeatureCollection
+        ).features.find((f) => f.properties?.zone === zone);
         if (!feature) return;
 
         const bounds = L.geoJSON(feature).getBounds();
         const center = bounds.getCenter();
 
-        const cloudIcon = data.cloud_cover > 75 ? '☁️' :
-                          data.cloud_cover > 50 ? '⛅' :
-                          data.cloud_cover > 25 ? '🌤️' : '☀️';
+        const cloudIcon =
+          data.cloud_cover > 75
+            ? "☁️"
+            : data.cloud_cover > 50
+              ? "⛅"
+              : data.cloud_cover > 25
+                ? "🌤️"
+                : "☀️";
 
         const icon = L.divIcon({
           html: `
@@ -864,7 +953,7 @@ function MapContent({
               filter: drop-shadow(0 0 2px rgba(0,0,0,0.8));
             ">${cloudIcon}</div>
           `,
-          className: '',
+          className: "",
           iconSize: [24, 24],
           iconAnchor: [12, 12],
         });
@@ -872,12 +961,15 @@ function MapContent({
         const marker = L.marker([center.lat, center.lng], {
           icon,
           interactive: true,
-        }).bindTooltip(`
+        }).bindTooltip(
+          `
           <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 8px; background: #161B22; border: 1px solid #30363D;">
             <div style="font-weight: 600; color: #E6EDF3; margin-bottom: 4px;">${zone}</div>
             <div style="color: #8B949E;">${data.cloud_cover}% cloud cover</div>
           </div>
-        `, { direction: 'auto', className: 'zone-tooltip' });
+        `,
+          { direction: "auto", className: "zone-tooltip" },
+        );
 
         markers.push(marker);
       });
@@ -917,14 +1009,14 @@ function MapContent({
 
     const updateLayer = async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const L = (await import('leaflet')) as any;
+      const L = (await import("leaflet")) as any;
 
       // Store old layer ref BEFORE creating new one
       const oldLayer = precipLayerRef.current;
 
       const wmsOptions: Record<string, unknown> = {
-        layers: 'GDPS.ETA_PR',
-        format: 'image/png',
+        layers: "GDPS.ETA_PR",
+        format: "image/png",
         transparent: true,
         opacity: 0.6, // Start at target opacity (no fade to avoid race conditions)
         attribution: '&copy; <a href="https://weather.gc.ca/">ECCC</a>',
@@ -934,7 +1026,10 @@ function MapContent({
       }
 
       // Create new layer and add to map
-      const newLayer = L.tileLayer.wms('https://geo.weather.gc.ca/geomet', wmsOptions);
+      const newLayer = L.tileLayer.wms(
+        "https://geo.weather.gc.ca/geomet",
+        wmsOptions,
+      );
       newLayer.setZIndex(95);
       newLayer.addTo(map);
       precipLayerRef.current = newLayer;
@@ -952,7 +1047,7 @@ function MapContent({
   return (
     <div
       ref={containerRef}
-      style={{ height: '100%', width: '100%', background: '#0D1117' }}
+      style={{ height: "100%", width: "100%", background: "#0D1117" }}
     />
   );
 }
@@ -971,7 +1066,9 @@ export default function OntarioMap({ onZoneSelect, selectedZone }: Props) {
   const [showScrubber, setShowScrubber] = useState(true);
   const [scrubTime, setScrubTime] = useState<Date | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [priceSource, setPriceSource] = useState<'realtime' | 'day_ahead' | 'unavailable'>('realtime');
+  const [priceSource, setPriceSource] = useState<
+    "realtime" | "day_ahead" | "unavailable"
+  >("realtime");
 
   // Throttle refs for scrub-fetch (replaces broken debounce)
   const lastFetchTimeRef = useRef<number>(0);
@@ -983,42 +1080,48 @@ export default function OntarioMap({ onZoneSelect, selectedZone }: Props) {
     try {
       const url = atTime
         ? `/api/prices/at-time?timestamp=${atTime.toISOString()}`
-        : '/api/prices';
+        : "/api/prices";
       const pricesRes = await fetch(url);
 
       if (!pricesRes.ok) {
-        throw new Error('Failed to fetch zone data');
+        throw new Error("Failed to fetch zone data");
       }
 
       const pricesData = await pricesRes.json();
 
       // Track the source for time scrubber display
-      if (pricesData.source === 'day_ahead') {
-        setPriceSource('day_ahead');
-      } else if (pricesData.source === 'realtime') {
-        setPriceSource('realtime');
-      } else if (pricesData.data?.length === 0 && atTime && atTime > new Date()) {
-        setPriceSource('unavailable');
+      if (pricesData.source === "day_ahead") {
+        setPriceSource("day_ahead");
+      } else if (pricesData.source === "realtime") {
+        setPriceSource("realtime");
+      } else if (
+        pricesData.data?.length === 0 &&
+        atTime &&
+        atTime > new Date()
+      ) {
+        setPriceSource("unavailable");
       } else {
-        setPriceSource('realtime');
+        setPriceSource("realtime");
       }
 
       // Create lookup map
       const priceMap: ZonePriceMap = {};
 
-      pricesData.data.forEach((p: { zone: string; price: number; last_updated?: string }) => {
-        priceMap[p.zone] = {
-          zone: p.zone,
-          price: p.price,
-          demand_mw: 0,
-          last_updated: p.last_updated || new Date().toISOString(),
-        };
-      });
+      pricesData.data.forEach(
+        (p: { zone: string; price: number; last_updated?: string }) => {
+          priceMap[p.zone] = {
+            zone: p.zone,
+            price: p.price,
+            demand_mw: 0,
+            last_updated: p.last_updated || new Date().toISOString(),
+          };
+        },
+      );
 
       setZonePrices(priceMap);
       setLoading(false);
     } catch (err) {
-      console.error('Error fetching zone prices:', err);
+      console.error("Error fetching zone prices:", err);
       setLoading(false);
     }
   }, []);
@@ -1028,7 +1131,7 @@ export default function OntarioMap({ onZoneSelect, selectedZone }: Props) {
     try {
       const url = atTime
         ? `/api/weather/at-time?timestamp=${atTime.toISOString()}`
-        : '/api/weather';
+        : "/api/weather";
       const res = await fetch(url);
       if (res.ok) {
         const json = await res.json();
@@ -1039,7 +1142,7 @@ export default function OntarioMap({ onZoneSelect, selectedZone }: Props) {
         setWeatherData(map);
       }
     } catch (err) {
-      console.error('Weather fetch error:', err);
+      console.error("Weather fetch error:", err);
     }
   }, []);
 
@@ -1107,118 +1210,198 @@ export default function OntarioMap({ onZoneSelect, selectedZone }: Props) {
 
   // Calculate province-wide average
   const avgPrice = useMemo(() => {
-    const prices = Object.values(zonePrices).map(z => z.price);
+    const prices = Object.values(zonePrices).map((z) => z.price);
     if (prices.length === 0) return null;
     return prices.reduce((a, b) => a + b, 0) / prices.length;
   }, [zonePrices]);
 
   return (
     <>
-      <div className={styles.legendBar} style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', fontSize: '10px', alignItems: 'center', padding: '8px 12px 6px 12px' }}>
-          {avgPrice !== null && (
-            <div style={{ color: '#8B949E', whiteSpace: 'nowrap' }}>
-              Avg: <span style={{ color: priceToColor(avgPrice), fontWeight: 600 }}>${avgPrice.toFixed(2)}</span>
-            </div>
-          )}
-          {showPricing && (
-            <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-              <span style={{ color: '#8B949E' }}>$:</span>
-              <div style={{ display: 'flex', gap: '2px' }}>
-                {([
-                  { color: '#1E5AA8', label: '< -$2000', desc: 'Deep Negative' },
-                  { color: '#4A90D9', label: '-$2000 to -$100', desc: 'Negative' },
-                  { color: '#7FE5E5', label: '-$100 to -$16', desc: 'Low Negative' },
-                  { color: '#D4F5D4', label: '-$16 to -$4', desc: 'Near Zero (-)' },
-                  { color: '#FFF8D6', label: '-$4 to $0', desc: 'Near Zero' },
-                  { color: '#FCE88C', label: '$0 to $10', desc: 'Low' },
-                  { color: '#F8D14F', label: '$10 to $30', desc: 'Normal' },
-                  { color: '#F5A623', label: '$30 to $60', desc: 'Moderate' },
-                  { color: '#E07830', label: '$60 to $100', desc: 'Elevated' },
-                  { color: '#C83C23', label: '$100 to $400', desc: 'High' },
-                  { color: '#8B2913', label: '$400 to $1200', desc: 'Very High' },
-                  { color: '#5C1A0B', label: '> $1200', desc: 'Critical' },
-                ] as const).map((tier) => (
-                  <Tooltip
-                    key={tier.color}
-                    content={
-                      <div>
-                        <div style={{ fontWeight: 600, marginBottom: 2 }}>{tier.desc}</div>
-                        <div style={{ color: tier.color }}>{tier.label}/MWh</div>
+      <div
+        className={styles.legendBar}
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          gap: "10px",
+          fontSize: "10px",
+          alignItems: "center",
+          padding: "8px 12px 6px 12px",
+        }}
+      >
+        {avgPrice !== null && (
+          <div style={{ color: "#8B949E", whiteSpace: "nowrap" }}>
+            Avg:{" "}
+            <span style={{ color: priceToColor(avgPrice), fontWeight: 600 }}>
+              ${avgPrice.toFixed(2)}
+            </span>
+          </div>
+        )}
+        {showPricing && (
+          <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
+            <span style={{ color: "#8B949E" }}>$:</span>
+            <div style={{ display: "flex", gap: "2px" }}>
+              {(
+                [
+                  {
+                    color: "#1E5AA8",
+                    label: "< -$2000",
+                    desc: "Deep Negative",
+                  },
+                  {
+                    color: "#4A90D9",
+                    label: "-$2000 to -$100",
+                    desc: "Negative",
+                  },
+                  {
+                    color: "#7FE5E5",
+                    label: "-$100 to -$16",
+                    desc: "Low Negative",
+                  },
+                  {
+                    color: "#D4F5D4",
+                    label: "-$16 to -$4",
+                    desc: "Near Zero (-)",
+                  },
+                  { color: "#FFF8D6", label: "-$4 to $0", desc: "Near Zero" },
+                  { color: "#FCE88C", label: "$0 to $10", desc: "Low" },
+                  { color: "#F8D14F", label: "$10 to $30", desc: "Normal" },
+                  { color: "#F5A623", label: "$30 to $60", desc: "Moderate" },
+                  { color: "#E07830", label: "$60 to $100", desc: "Elevated" },
+                  { color: "#C83C23", label: "$100 to $400", desc: "High" },
+                  {
+                    color: "#8B2913",
+                    label: "$400 to $1200",
+                    desc: "Very High",
+                  },
+                  { color: "#5C1A0B", label: "> $1200", desc: "Critical" },
+                ] as const
+              ).map((tier) => (
+                <Tooltip
+                  key={tier.color}
+                  content={
+                    <div>
+                      <div style={{ fontWeight: 600, marginBottom: 2 }}>
+                        {tier.desc}
                       </div>
-                    }
-                  >
-                    <div style={{ width: 10, height: 10, background: tier.color, cursor: 'default' }} />
-                  </Tooltip>
-                ))}
-              </div>
+                      <div style={{ color: tier.color }}>{tier.label}/MWh</div>
+                    </div>
+                  }
+                >
+                  <div
+                    style={{
+                      width: 10,
+                      height: 10,
+                      background: tier.color,
+                      cursor: "default",
+                    }}
+                  />
+                </Tooltip>
+              ))}
             </div>
-          )}
-          {showGeneration && (
-            <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-              <span style={{ color: '#8B949E' }}>Fuel:</span>
-              <div style={{ display: 'flex', gap: '3px' }}>
-                {Object.entries(FUEL_COLORS).map(([fuel, color]) => (
-                  <Tooltip key={fuel} content={<span style={{ textTransform: 'capitalize' }}>{fuel}</span>}>
-                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: color, cursor: 'default' }} />
-                  </Tooltip>
-                ))}
-              </div>
+          </div>
+        )}
+        {showGeneration && (
+          <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
+            <span style={{ color: "#8B949E" }}>Fuel:</span>
+            <div style={{ display: "flex", gap: "3px" }}>
+              {Object.entries(FUEL_COLORS).map(([fuel, color]) => (
+                <Tooltip
+                  key={fuel}
+                  content={
+                    <span style={{ textTransform: "capitalize" }}>{fuel}</span>
+                  }
+                >
+                  <div
+                    style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: "50%",
+                      background: color,
+                      cursor: "default",
+                    }}
+                  />
+                </Tooltip>
+              ))}
             </div>
-          )}
-          {showTemp && (
-            <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-              <span style={{ color: '#8B949E' }}>°C:</span>
-              <div style={{ display: 'flex', gap: '2px' }}>
-                {([
-                  { color: '#1E5AA8', label: '< -20°C' },
-                  { color: '#4A90D9', label: '-20 to -10°C' },
-                  { color: '#7FE5E5', label: '-10 to 0°C' },
-                  { color: '#A8E6CF', label: '0 to 10°C' },
-                  { color: '#FCE88C', label: '10 to 20°C' },
-                  { color: '#F5A623', label: '20 to 30°C' },
-                  { color: '#C83C23', label: '> 30°C' },
-                ] as const).map((tier) => (
-                  <Tooltip key={tier.color} content={tier.label}>
-                    <div style={{ width: 10, height: 10, background: tier.color, cursor: 'default' }} />
-                  </Tooltip>
-                ))}
-              </div>
+          </div>
+        )}
+        {showTemp && (
+          <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
+            <span style={{ color: "#8B949E" }}>°C:</span>
+            <div style={{ display: "flex", gap: "2px" }}>
+              {(
+                [
+                  { color: "#1E5AA8", label: "< -20°C" },
+                  { color: "#4A90D9", label: "-20 to -10°C" },
+                  { color: "#7FE5E5", label: "-10 to 0°C" },
+                  { color: "#A8E6CF", label: "0 to 10°C" },
+                  { color: "#FCE88C", label: "10 to 20°C" },
+                  { color: "#F5A623", label: "20 to 30°C" },
+                  { color: "#C83C23", label: "> 30°C" },
+                ] as const
+              ).map((tier) => (
+                <Tooltip key={tier.color} content={tier.label}>
+                  <div
+                    style={{
+                      width: 10,
+                      height: 10,
+                      background: tier.color,
+                      cursor: "default",
+                    }}
+                  />
+                </Tooltip>
+              ))}
             </div>
-          )}
-          {showPrecip && (
-            <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-              <span style={{ color: '#8B949E' }}>mm:</span>
-              <div style={{ display: 'flex', gap: '2px' }}>
-                {([
-                  { color: '#E8F4E8', label: '0 mm', desc: 'None' },
-                  { color: '#A8D5BA', label: '< 1 mm', desc: 'Trace' },
-                  { color: '#7EC8E3', label: '1-2 mm', desc: 'Light' },
-                  { color: '#4A90D9', label: '2-5 mm', desc: 'Moderate' },
-                  { color: '#1E5AA8', label: '5-10 mm', desc: 'Heavy' },
-                  { color: '#7B68EE', label: '10-25 mm', desc: 'Very Heavy' },
-                  { color: '#9932CC', label: '> 25 mm', desc: 'Extreme' },
-                ] as const).map((tier) => (
-                  <Tooltip
-                    key={tier.color}
-                    content={
-                      <div>
-                        <div style={{ fontWeight: 600, marginBottom: 2 }}>{tier.desc}</div>
-                        <div style={{ color: tier.color }}>{tier.label}</div>
+          </div>
+        )}
+        {showPrecip && (
+          <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
+            <span style={{ color: "#8B949E" }}>mm:</span>
+            <div style={{ display: "flex", gap: "2px" }}>
+              {(
+                [
+                  { color: "#E8F4E8", label: "0 mm", desc: "None" },
+                  { color: "#A8D5BA", label: "< 1 mm", desc: "Trace" },
+                  { color: "#7EC8E3", label: "1-2 mm", desc: "Light" },
+                  { color: "#4A90D9", label: "2-5 mm", desc: "Moderate" },
+                  { color: "#1E5AA8", label: "5-10 mm", desc: "Heavy" },
+                  { color: "#7B68EE", label: "10-25 mm", desc: "Very Heavy" },
+                  { color: "#9932CC", label: "> 25 mm", desc: "Extreme" },
+                ] as const
+              ).map((tier) => (
+                <Tooltip
+                  key={tier.color}
+                  content={
+                    <div>
+                      <div style={{ fontWeight: 600, marginBottom: 2 }}>
+                        {tier.desc}
                       </div>
-                    }
-                  >
-                    <div style={{ width: 10, height: 10, background: tier.color, cursor: 'default' }} />
-                  </Tooltip>
-                ))}
-              </div>
+                      <div style={{ color: tier.color }}>{tier.label}</div>
+                    </div>
+                  }
+                >
+                  <div
+                    style={{
+                      width: 10,
+                      height: 10,
+                      background: tier.color,
+                      cursor: "default",
+                    }}
+                  />
+                </Tooltip>
+              ))}
             </div>
-          )}
-        </div>
+          </div>
+        )}
+      </div>
 
       {!mounted || loading ? (
         <div className={styles.placeholder}>Loading map...</div>
       ) : (
-        <div className={styles.mapContainer} style={{ flex: 1, minHeight: 0, width: '100%', position: 'relative' }}>
+        <div
+          className={styles.mapContainer}
+          style={{ flex: 1, minHeight: 0, width: "100%", position: "relative" }}
+        >
           <MapContent
             zonePrices={zonePrices}
             selectedZone={selectedZone}
@@ -1246,7 +1429,7 @@ export default function OntarioMap({ onZoneSelect, selectedZone }: Props) {
         </div>
       )}
 
-      <div className={styles.weatherBar} style={{ padding: '8px 12px 8px' }}>
+      <div className={styles.weatherBar} style={{ padding: "8px 12px 8px" }}>
         <button
           className={showPricing ? styles.weatherBtnActive : styles.weatherBtn}
           onClick={() => setShowPricing((v) => !v)}
@@ -1255,14 +1438,18 @@ export default function OntarioMap({ onZoneSelect, selectedZone }: Props) {
           <span>Pricing</span>
         </button>
         <button
-          className={showGeneration ? styles.weatherBtnActive : styles.weatherBtn}
+          className={
+            showGeneration ? styles.weatherBtnActive : styles.weatherBtn
+          }
           onClick={() => setShowGeneration((v) => !v)}
         >
           <Icon icon="flash" size={12} />
           <span>Generation</span>
         </button>
         <button
-          className={showTransmission ? styles.weatherBtnActive : styles.weatherBtn}
+          className={
+            showTransmission ? styles.weatherBtnActive : styles.weatherBtn
+          }
           onClick={() => setShowTransmission((v) => !v)}
         >
           <Icon icon="route" size={12} />
@@ -1315,38 +1502,40 @@ export default function OntarioMap({ onZoneSelect, selectedZone }: Props) {
           margin: 0 !important;
         }
         .leaflet-container {
-          font-family: 'JetBrains Mono', monospace !important;
+          font-family: "JetBrains Mono", monospace !important;
         }
         .leaflet-control-zoom a {
-          background: #161B22 !important;
-          color: #E6EDF3 !important;
-          border-color: #30363D !important;
+          background: #161b22 !important;
+          color: #e6edf3 !important;
+          border-color: #30363d !important;
           border-radius: 0 !important;
         }
         .leaflet-control-zoom a:hover {
-          background: #30363D !important;
+          background: #30363d !important;
         }
         .leaflet-control-zoom {
-          border: 1px solid #30363D !important;
+          border: 1px solid #30363d !important;
           border-radius: 0 !important;
         }
         .leaflet-control-attribution {
           background: rgba(13, 17, 23, 0.8) !important;
-          color: #8B949E !important;
+          color: #8b949e !important;
           font-size: 9px !important;
         }
         .leaflet-control-attribution a {
-          color: #58A6FF !important;
+          color: #58a6ff !important;
         }
         /* Glow effect for selected zone */
         .zone-selected {
-          filter: drop-shadow(0 0 8px rgba(88, 166, 255, 0.6)) drop-shadow(0 0 16px rgba(88, 166, 255, 0.4));
+          filter: drop-shadow(0 0 8px rgba(88, 166, 255, 0.6))
+            drop-shadow(0 0 16px rgba(88, 166, 255, 0.4));
         }
         /* Inner glow border on hover */
         .zone-hover {
-          stroke: #58A6FF !important;
+          stroke: #58a6ff !important;
           stroke-width: 2.5 !important;
-          filter: drop-shadow(0 0 6px rgba(88, 166, 255, 0.6)) drop-shadow(0 0 12px rgba(88, 166, 255, 0.3));
+          filter: drop-shadow(0 0 6px rgba(88, 166, 255, 0.6))
+            drop-shadow(0 0 12px rgba(88, 166, 255, 0.3));
         }
         .leaflet-interactive {
           cursor: pointer;

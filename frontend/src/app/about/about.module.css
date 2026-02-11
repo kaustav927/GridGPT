@@ -17,6 +17,13 @@
   justify-content: space-between;
   padding: 0 24px;
   flex-shrink: 0;
+  position: relative;
+}
+
+.brandGroup {
+  display: flex;
+  align-items: center;
+  gap: 16px;
 }
 
 .brandLink {
@@ -39,15 +46,78 @@
   font-family: 'JetBrains Mono', monospace;
 }
 
-.backLink {
+/* Desktop nav links */
+.headerNav {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   font-size: 12px;
+  margin-left: 8px;
+}
+
+.headerNavLink {
   color: var(--text-secondary);
   text-decoration: none;
   transition: color 0.15s;
 }
 
-.backLink:hover {
+.headerNavLink:hover {
   color: var(--accent-blue);
+}
+
+/* Hamburger — hidden on desktop */
+.hamburger {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  background: none;
+  border: 1px solid var(--border-color);
+  padding: 6px 7px;
+  cursor: pointer;
+}
+
+.hamburger span {
+  display: block;
+  width: 16px;
+  height: 1.5px;
+  background: var(--text-secondary);
+  border-radius: 1px;
+}
+
+.hamburger:hover span {
+  background: var(--text-primary);
+}
+
+/* Mobile menu — hidden by default */
+.mobileOverlay {
+  display: none;
+}
+
+.mobileMenu {
+  display: none;
+}
+
+.mobileMenuOpen {
+  /* activated via mobile media query */
+}
+
+.mobileMenuLink {
+  display: block;
+  padding: 10px 16px;
+  color: var(--text-primary);
+  text-decoration: none;
+  font-size: 13px;
+  font-family: 'JetBrains Mono', monospace;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.mobileMenuLink:hover {
+  background: rgba(88, 166, 255, 0.08);
+}
+
+.mobileMenuLink:last-child {
+  border-bottom: none;
 }
 
 /* Content */
@@ -641,14 +711,44 @@
   line-height: 1.5;
 }
 
-/* Responsive */
-@media (max-width: 640px) {
-  .content {
-    padding: 32px 16px 48px;
-  }
+/* Mobile */
+@media (max-width: 900px) {
+  .headerNav { display: none; }
 
   .header {
     padding: 0 12px;
+  }
+
+  .hamburger {
+    display: flex;
+  }
+
+  .mobileOverlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 999;
+  }
+
+  .mobileMenu {
+    display: none;
+    position: absolute;
+    top: 100%;
+    right: 12px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    min-width: 160px;
+    z-index: 1000;
+  }
+
+  .mobileMenuOpen {
+    display: block;
+  }
+}
+
+@media (max-width: 640px) {
+  .content {
+    padding: 32px 16px 48px;
   }
 
   .pageTitle {

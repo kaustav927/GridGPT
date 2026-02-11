@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { Icon } from '@blueprintjs/core';
 import Footer from '@/components/Footer';
@@ -20,17 +21,54 @@ const DATA_SOURCES = [
 ];
 
 export default function AboutPage() {
+  const [menuOpen, setMenuOpen] = useState(false);
+
   return (
     <div className={styles.page}>
       {/* Header */}
       <header className={styles.header}>
-        <Link href="/" className={styles.brandLink}>
-          <Icon icon="lightning" size={20} color="#58A6FF" />
-          <h1 className={styles.brandTitle}>GridGPT</h1>
-        </Link>
-        <Link href="/" className={styles.backLink}>
-          Back to Dashboard
-        </Link>
+        <div className={styles.brandGroup}>
+          <Link href="/" className={styles.brandLink}>
+            <Icon icon="lightning" size={20} color="#58A6FF" />
+            <h1 className={styles.brandTitle}>GridGPT</h1>
+          </Link>
+          <nav className={styles.headerNav}>
+            <Link href="/" className={styles.headerNavLink}>Dashboard</Link>
+            <a
+              href="https://github.com/kaustav927/GridGPT"
+              target="_blank"
+              rel="noopener noreferrer"
+              className={styles.headerNavLink}
+            >
+              GitHub
+            </a>
+          </nav>
+        </div>
+        <button
+          type="button"
+          className={styles.hamburger}
+          onClick={() => setMenuOpen(!menuOpen)}
+          aria-label="Menu"
+        >
+          <span />
+          <span />
+          <span />
+        </button>
+        {menuOpen && <div className={styles.mobileOverlay} onClick={() => setMenuOpen(false)} />}
+        <nav className={`${styles.mobileMenu} ${menuOpen ? styles.mobileMenuOpen : ''}`}>
+          <Link href="/" className={styles.mobileMenuLink} onClick={() => setMenuOpen(false)}>
+            Dashboard
+          </Link>
+          <a
+            href="https://github.com/kaustav927/GridGPT"
+            target="_blank"
+            rel="noopener noreferrer"
+            className={styles.mobileMenuLink}
+            onClick={() => setMenuOpen(false)}
+          >
+            GitHub
+          </a>
+        </nav>
       </header>
 
       {/* Content */}

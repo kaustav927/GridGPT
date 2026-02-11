@@ -18,6 +18,12 @@
   padding: 0 24px;
 }
 
+.brandGroup {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
 .brandSection {
   display: flex;
   align-items: center;
@@ -70,6 +76,90 @@
   font-weight: 600;
   color: var(--text-primary);
   font-variant-numeric: tabular-nums;
+}
+
+/* Header nav — About / GitHub links, desktop only */
+.headerNav {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  margin-left: 8px;
+}
+
+.headerNavLink {
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.headerNavLink:hover {
+  color: var(--accent-blue);
+}
+
+.timestampRow {
+  display: contents;
+}
+
+.timestampSep {
+  font-size: 11px;
+  color: var(--text-secondary);
+  opacity: 0.4;
+}
+
+/* Hamburger — hidden on desktop */
+.hamburger {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  background: none;
+  border: 1px solid var(--border-color);
+  padding: 6px 7px;
+  cursor: pointer;
+}
+
+.hamburger span {
+  display: block;
+  width: 16px;
+  height: 1.5px;
+  background: var(--text-secondary);
+  border-radius: 1px;
+}
+
+.hamburger:hover span {
+  background: var(--text-primary);
+}
+
+/* Mobile dropdown menu */
+.mobileOverlay {
+  display: none;
+}
+
+.mobileMenu {
+  display: none;
+}
+
+.mobileMenuOpen {
+  /* activated via mobile media query below */
+}
+
+.mobileMenuLink {
+  display: block;
+  padding: 10px 16px;
+  color: var(--text-primary);
+  text-decoration: none;
+  font-size: 13px;
+  font-family: 'JetBrains Mono', monospace;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.mobileMenuLink:hover {
+  background: rgba(88, 166, 255, 0.08);
+}
+
+.mobileMenuLink:last-child {
+  border-bottom: none;
 }
 
 .mainContent {
@@ -200,10 +290,83 @@
 
 /* Mobile/tablet - single column */
 @media (max-width: 900px) {
-  /* Compact header: hide timestamps */
-  .timestamp, .timestampValue { display: none; }
-  .statusSection { gap: 8px; }
-  .header { padding: 0 12px; }
+  /* Hide desktop header nav on mobile */
+  .headerNav { display: none; }
+
+  /* Header becomes wrapping flex for timestamp second row */
+  .header {
+    height: auto;
+    padding: 8px 12px;
+    flex-wrap: wrap;
+    position: relative;
+  }
+
+  /* statusSection becomes the full-width second row, centered */
+  .statusSection {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    order: 10;
+    padding-top: 6px;
+    border-top: 1px solid var(--border-color);
+    margin-top: 6px;
+  }
+
+  .liveStatus {
+    font-size: 10px;
+    gap: 5px;
+  }
+
+  /* Hamburger visible on mobile — pinned top-right */
+  .hamburger {
+    display: flex;
+    position: absolute;
+    right: 12px;
+    top: 8px;
+    z-index: 1001;
+  }
+
+  /* timestampRow becomes transparent so children flow inline with LIVE */
+  .timestampRow {
+    display: contents;
+  }
+
+  .timestamp {
+    font-size: 9px;
+  }
+
+  .timestampValue {
+    font-size: 10px;
+  }
+
+  .timestampSep {
+    font-size: 9px;
+  }
+
+  /* Mobile overlay + dropdown */
+  .mobileOverlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 999;
+  }
+
+  .mobileMenu {
+    display: none;
+    position: absolute;
+    top: 100%;
+    right: 12px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    min-width: 160px;
+    z-index: 1000;
+  }
+
+  .mobileMenuOpen {
+    display: block;
+  }
 
   /* Single column grid */
   .mainContent {
@@ -219,7 +382,7 @@
 
   /* Panel ordering + sizing */
   .panelGridAI { order: 1; flex: none; max-height: none; height: 42vh; }
-  .panelMap { order: 2; height: calc(100vh - 48px - 42vh - 24px); }
+  .panelMap { order: 2; height: calc(100vh - 64px - 42vh - 24px); }
   .panelMarketOverview { order: 3; }
   .panelFuelMix { order: 4; }
   .panelInterties { order: 5; }

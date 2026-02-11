@@ -17,6 +17,7 @@ export default function Dashboard() {
   const [currentTime, setCurrentTime] = useState<Date | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [selectedZone, setSelectedZone] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const handleZoneSelect = useCallback((zone: string | null) => {
     setSelectedZone(zone);
@@ -37,10 +38,11 @@ export default function Dashboard() {
   }, []);
 
   const formatTime = (date: Date | null) => {
-    if (!date) return '--:--';
+    if (!date) return '--:--:--';
     return date.toLocaleTimeString('en-US', {
       hour: '2-digit',
       minute: '2-digit',
+      second: '2-digit',
       timeZone: 'America/Toronto',
       timeZoneName: 'short'
     });
@@ -50,22 +52,63 @@ export default function Dashboard() {
     <div className={styles.dashboard}>
       {/* Header */}
       <header className={styles.header}>
-        <Link href="/" style={{ textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'center', gap: 'inherit' }}>
-          <div className={styles.brandSection}>
-            <Icon icon="lightning" size={24} color="#58A6FF" />
-            <h1 className={styles.title}>GridGPT</h1>
-          </div>
-        </Link>
+        <div className={styles.brandGroup}>
+          <Link href="/" style={{ textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'center', gap: 'inherit' }}>
+            <div className={styles.brandSection}>
+              <Icon icon="lightning" size={24} color="#58A6FF" />
+              <h1 className={styles.title}>GridGPT</h1>
+            </div>
+          </Link>
+          <nav className={styles.headerNav}>
+            <Link href="/about" className={styles.headerNavLink}>About</Link>
+            <a
+              href="https://github.com/kaustav927/GridGPT"
+              target="_blank"
+              rel="noopener noreferrer"
+              className={styles.headerNavLink}
+            >
+              GitHub
+            </a>
+          </nav>
+        </div>
         <div className={styles.statusSection}>
           <div className={styles.liveStatus}>
             <div className={styles.liveDot} />
             <span>LIVE</span>
           </div>
-          <span className={styles.timestamp}>Last Refreshed:</span>
-          <span className={styles.timestampValue}>{formatTime(lastRefresh)}</span>
-          <span className={styles.timestamp}>Current:</span>
-          <span className={styles.timestampValue}>{formatTime(currentTime)}</span>
+          <div className={styles.timestampRow}>
+            <span className={styles.timestamp}>Last:</span>
+            <span className={styles.timestampValue}>{formatTime(lastRefresh)}</span>
+            <span className={styles.timestampSep}>|</span>
+            <span className={styles.timestamp}>Current:</span>
+            <span className={styles.timestampValue}>{formatTime(currentTime)}</span>
+          </div>
         </div>
+        <button
+          type="button"
+          className={styles.hamburger}
+          onClick={() => setMenuOpen(!menuOpen)}
+          aria-label="Menu"
+        >
+          <span />
+          <span />
+          <span />
+        </button>
+        {menuOpen && <div className={styles.mobileOverlay} onClick={() => setMenuOpen(false)} />}
+        <nav className={`${styles.mobileMenu} ${menuOpen ? styles.mobileMenuOpen : ''}`}>
+          <Link href="/about" className={styles.mobileMenuLink} onClick={() => setMenuOpen(false)}>
+            About
+          </Link>
+          <a
+            href="https://github.com/kaustav927/GridGPT"
+            target="_blank"
+            rel="noopener noreferrer"
+            className={styles.mobileMenuLink}
+            onClick={() => setMenuOpen(false)}
+          >
+            GitHub
+          </a>
+        </nav>
       </header>
 
       {/* Main Content */}
