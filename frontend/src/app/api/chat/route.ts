@@ -59,6 +59,7 @@ export async function POST(request: Request) {
     ?.split('=')[1];
 
   const uid = existingUid && UUID_RE.test(existingUid) ? existingUid : crypto.randomUUID();
+  let remaining = -1; // -1 = unknown (rate limit check failed)
 
   try {
     const rows = await query<{ cnt: number }>(
@@ -71,6 +72,7 @@ export async function POST(request: Request) {
         JSON.stringify({
           error: 'rate_limit',
           message: `You've reached the limit of ${RATE_LIMIT_PER_DAY} questions per day. Come back tomorrow!`,
+          remaining: 0,
         }),
         {
           status: 429,
@@ -83,6 +85,7 @@ export async function POST(request: Request) {
     }
 
     await execute(`INSERT INTO ieso.chat_rate_limits (user_id) VALUES ('${uid}')`);
+    remaining = RATE_LIMIT_PER_DAY - count - 1;
   } catch (err) {
     // Fail-open: if rate limit check fails, proceed anyway
     console.error('Rate limit check failed (proceeding):', err instanceof Error ? err.message : err);
@@ -105,6 +108,11 @@ export async function POST(request: Request) {
       };
 
       try {
+        // Emit quota as the first event so frontend can display counter
+        if (remaining >= 0) {
+          send({ type: 'quota', remaining });
+        }
+
         let currentMessages = [...anthropicMessages];
         let finalText = '';
         let iterations = 0;
@@ -232,4 +240,38 @@ export async function POST(request: Request) {
       'Set-Cookie': makeCookie(uid),
     },
   });
+}
+
+export async function GET(request: Request) {
+  const cookieHeader = request.headers.get('cookie') || '';
+  const existingUid = cookieHeader
+    .split(';')
+    .map((c) => c.trim())
+    .find((c) => c.startsWith(`${COOKIE_NAME}=`))
+    ?.split('=')[1];
+
+  const uid = existingUid && UUID_RE.test(existingUid) ? existingUid : crypto.randomUUID();
+
+  try {
+    const rows = await query<{ cnt: number }>(
+      `SELECT count() AS cnt FROM ieso.chat_rate_limits WHERE user_id = '${uid}' AND requested_at >= now() - INTERVAL 1 DAY`
+    );
+    const count = rows[0]?.cnt ?? 0;
+    const remaining = RATE_LIMIT_PER_DAY - count;
+
+    return new Response(JSON.stringify({ remaining }), {
+      headers: {
+        'Content-Type': 'application/json',
+        'Set-Cookie': makeCookie(uid),
+      },
+    });
+  } catch {
+    // Fail-open: return unknown
+    return new Response(JSON.stringify({ remaining: -1 }), {
+      headers: {
+        'Content-Type': 'application/json',
+        'Set-Cookie': makeCookie(uid),
+      },
+    });
+  }
 }

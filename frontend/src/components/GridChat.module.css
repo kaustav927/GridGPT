@@ -240,6 +240,30 @@
   40% { transform: scale(1); opacity: 1; }
 }
 
+/* AI disclaimer */
+.disclaimer {
+  font-size: 9px;
+  font-style: italic;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border-color);
+  margin-top: 6px;
+  padding-top: 4px;
+}
+
+/* Question counter */
+.quotaCounter {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 4px 0;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.quotaCounterWarn {
+  composes: quotaCounter;
+  color: var(--accent-orange, #e5a100);
+}
+
 /* Suggested Questions */
 .suggestions {
   padding: 8px;
@@ -348,6 +372,24 @@
 .sendBtn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+.stopBtn {
+  background: var(--accent-orange, #e5a100);
+  border: none;
+  color: var(--bg-primary);
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  font-size: 12px;
+}
+
+.stopBtn:hover {
+  opacity: 0.85;
 }
 
 /* Expand button */

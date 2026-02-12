@@ -166,6 +166,11 @@ const MessageBubble = memo(function MessageBubble({ msg }: { msg: ChatMessage })
         className={styles.messageContent}
         dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
       />
+      {msg.role === 'assistant' && (
+        <div className={styles.disclaimer}>
+          AI-generated responses may be inaccurate. Please verify important information.
+        </div>
+      )}
     </div>
   );
 });
@@ -177,13 +182,38 @@ export default function GridChat() {
   const [streamingContent, setStreamingContent] = useState('');
   const [streamingTools, setStreamingTools] = useState<ToolCallMeta[]>([]);
   const [pendingTool, setPendingTool] = useState<PendingToolCall | null>(null);
+  const [remaining, setRemaining] = useState<number | null>(null);
   const [suggestions, setSuggestions] = useState(() => getSuggestedQuestions());
   const messageListRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const autoScrollRef = useRef(true);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Client-side randomization of suggestions (fixes hydration mismatch)
   useEffect(() => {
     setSuggestions(getRandomSuggestedQuestions());
+  }, []);
+
+  // Track whether user is near bottom via scroll events (fires before
+  // React renders new content, so it reflects pre-render position).
+  useEffect(() => {
+    const el = messageListRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      autoScrollRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    };
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => el.removeEventListener('scroll', onScroll);
+  }, []);
+
+  // Fetch remaining quota on mount
+  useEffect(() => {
+    fetch('/api/chat')
+      .then((r) => r.json())
+      .then((data) => {
+        if (typeof data.remaining === 'number') setRemaining(data.remaining);
+      })
+      .catch(() => {});
   }, []);
 
   // Load from localStorage on mount
@@ -205,19 +235,19 @@ export default function GridChat() {
     }
   }, [messages]);
 
-  // Smart auto-scroll: skip if user has text selected (preserves copy/paste)
-  // or if user has scrolled up to read earlier messages
+  // Auto-scroll: use ref set by scroll listener (pre-render position)
+  // instead of recalculating post-render where burst content breaks the check.
+  // Skip if user has text selected (preserves copy/paste).
   useEffect(() => {
     const selection = window.getSelection();
     if (selection && selection.toString().length > 0) return;
 
     const el = messageListRef.current;
     if (!el) return;
-    const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
-    if (isNearBottom) {
+    if (autoScrollRef.current) {
       el.scrollTop = el.scrollHeight;
     }
-  }, [messages, streamingContent]);
+  }, [messages, streamingContent, streamingTools, pendingTool]);
 
   // Auto-resize textarea
   const handleTextareaChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -251,15 +281,23 @@ export default function GridChat() {
         textareaRef.current.style.height = 'auto';
       }
 
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+
+      let fullContent = '';
+      const tools: ToolCallMeta[] = [];
+
       try {
         const response = await fetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ messages: updatedMessages }),
+          signal: controller.signal,
         });
 
         if (response.status === 429) {
           const data = await response.json();
+          setRemaining(0);
           const rateLimitMsg: ChatMessage = {
             id: generateId(),
             role: 'assistant',
@@ -279,8 +317,6 @@ export default function GridChat() {
 
         const decoder = new TextDecoder();
         let buffer = '';
-        let fullContent = '';
-        const tools: ToolCallMeta[] = [];
         let pendingSql = '';
         let pendingStrategy = '';
 
@@ -320,6 +356,9 @@ export default function GridChat() {
                   fullContent += event.content;
                   setStreamingContent(fullContent);
                   break;
+                case 'quota':
+                  setRemaining(event.remaining);
+                  break;
                 case 'done':
                   break;
               }
@@ -339,19 +378,34 @@ export default function GridChat() {
 
         setMessages((prev) => [...prev, assistantMessage]);
       } catch (err: unknown) {
-        const errMsg = err instanceof Error ? err.message : 'Something went wrong';
-        const errorMessage: ChatMessage = {
-          id: generateId(),
-          role: 'assistant',
-          content: `Error: ${errMsg}`,
-          timestamp: Date.now(),
-        };
-        setMessages((prev) => [...prev, errorMessage]);
+        if (err instanceof DOMException && err.name === 'AbortError') {
+          // User stopped — save whatever partial content we have
+          if (fullContent || tools.length > 0) {
+            const partialMessage: ChatMessage = {
+              id: generateId(),
+              role: 'assistant',
+              content: fullContent || '(Stopped)',
+              timestamp: Date.now(),
+              toolCalls: tools.length > 0 ? tools : undefined,
+            };
+            setMessages((prev) => [...prev, partialMessage]);
+          }
+        } else {
+          const errMsg = err instanceof Error ? err.message : 'Something went wrong';
+          const errorMessage: ChatMessage = {
+            id: generateId(),
+            role: 'assistant',
+            content: `Error: ${errMsg}`,
+            timestamp: Date.now(),
+          };
+          setMessages((prev) => [...prev, errorMessage]);
+        }
       } finally {
         setLoading(false);
         setStreamingContent('');
         setStreamingTools([]);
         setPendingTool(null);
+        abortControllerRef.current = null;
       }
     },
     [messages, loading]
@@ -360,6 +414,10 @@ export default function GridChat() {
   const handleSend = useCallback(() => {
     sendMessageWithToolTracking(input);
   }, [input, sendMessageWithToolTracking]);
+
+  const handleStop = useCallback(() => {
+    abortControllerRef.current?.abort();
+  }, []);
 
   const handleSuggestionClick = useCallback(
     (question: string) => {
@@ -404,7 +462,7 @@ export default function GridChat() {
       )}
 
       {/* Typing indicator */}
-      {loading && !streamingContent && streamingTools.length === 0 && !pendingTool && (
+      {loading && !streamingContent && !pendingTool && (
         <div className={styles.typing}>
           <div className={styles.typingDot} />
           <div className={styles.typingDot} />
@@ -434,6 +492,15 @@ export default function GridChat() {
     ) : null;
 
   const renderInputArea = () => (
+    <>
+      {remaining !== null && remaining >= 0 && (
+        <div
+          className={remaining === 0 ? styles.quotaCounterWarn : styles.quotaCounter}
+          title="Limited to 5 questions per day to prevent misuse"
+        >
+          {remaining} question{remaining !== 1 ? 's' : ''} left today
+        </div>
+      )}
     <div className={styles.inputArea}>
       {messages.length > 0 && (
         <button className={styles.clearBtn} onClick={handleClear}>
@@ -455,10 +522,17 @@ export default function GridChat() {
           }
         }}
       />
-      <button className={styles.sendBtn} onClick={handleSend} disabled={loading || !input.trim()}>
-        &#9654;
-      </button>
+      {loading ? (
+        <button className={styles.stopBtn} onClick={handleStop}>
+          &#9632;
+        </button>
+      ) : (
+        <button className={styles.sendBtn} onClick={handleSend} disabled={!input.trim()}>
+          &#9654;
+        </button>
+      )}
     </div>
+    </>
   );
 
   return (

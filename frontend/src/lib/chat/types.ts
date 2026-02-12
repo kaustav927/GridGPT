@@ -17,6 +17,7 @@ export type SSEEvent =
   | { type: 'tool_use'; name: string; sql: string; strategy: string }
   | { type: 'tool_result'; rowCount: number; durationMs: number }
   | { type: 'text_delta'; content: string }
+  | { type: 'quota'; remaining: number }
   | { type: 'done' };
 
 export interface PendingToolCall {

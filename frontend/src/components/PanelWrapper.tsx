@@ -68,7 +68,7 @@ export default function PanelWrapper({
         </div>
 
         {/* Collapsible body */}
-        {!collapsed && (
+        {!collapsed && !expanded && (
           <div className={`${styles.body} ${bodyClassName || ''}`} style={bodyStyle}>
             {children}
           </div>
