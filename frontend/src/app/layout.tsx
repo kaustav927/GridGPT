@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import Script from "next/script";
 import "@blueprintjs/core/lib/css/blueprint.css";
 import "@blueprintjs/icons/lib/css/blueprint-icons.css";
 import "@blueprintjs/select/lib/css/blueprint-select.css";
@@ -32,6 +33,11 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} bp5-dark antialiased`}
       >
         {children}
+        <Script
+          src="https://static.cloudflareinsights.com/beacon.min.js"
+          data-cf-beacon='{"token": "a9eb3c5740eb49fe825b6afacc65d70e"}'
+          strategy="afterInteractive"
+        />
       </body>
     </html>
   );
