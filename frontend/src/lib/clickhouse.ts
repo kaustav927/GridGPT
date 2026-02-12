@@ -26,3 +26,23 @@ export async function query<T>(sql: string): Promise<T[]> {
   const json = await response.json();
   return json.data as T[];
 }
+
+export async function execute(sql: string): Promise<void> {
+  const url = new URL(CLICKHOUSE_URL);
+  url.searchParams.set('database', CLICKHOUSE_DATABASE);
+
+  const response = await fetch(url.toString(), {
+    method: 'POST',
+    headers: {
+      'Authorization': `Basic ${Buffer.from(`${CLICKHOUSE_USER}:${CLICKHOUSE_PASSWORD}`).toString('base64')}`,
+      'Content-Type': 'text/plain',
+    },
+    body: sql,
+    cache: 'no-store',
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`ClickHouse error: ${error}`);
+  }
+}

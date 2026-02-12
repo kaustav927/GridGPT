@@ -351,3 +351,14 @@ SELECT valid_timestamp, zone,
   avg(cloud_cover) AS cloud_cover
 FROM ieso.weather
 GROUP BY valid_timestamp, zone;
+
+-- ============================================================
+-- CHAT RATE LIMITS (anonymous usage tracking)
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS ieso.chat_rate_limits (
+  user_id String,
+  requested_at DateTime DEFAULT now()
+) ENGINE = MergeTree()
+ORDER BY (user_id, requested_at)
+TTL requested_at + INTERVAL 7 DAY;

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback, memo } from 'react';
-import type { ChatMessage, ToolCallMeta, SSEEvent } from '@/lib/chat/types';
+import type { ChatMessage, ToolCallMeta, SSEEvent, PendingToolCall } from '@/lib/chat/types';
 import { getSuggestedQuestions, getRandomSuggestedQuestions } from '@/lib/chat/suggested-questions';
 import styles from './GridChat.module.css';
 
@@ -136,6 +136,20 @@ function ToolBadge({ meta }: ToolBadgeProps) {
   );
 }
 
+function PendingToolBadge({ pending }: { pending: PendingToolCall }) {
+  return (
+    <div>
+      {pending.strategy && (
+        <div className={styles.strategyText}>{pending.strategy}</div>
+      )}
+      <div className={styles.toolBadgePending}>
+        <span className={styles.toolSpinner} />
+        Querying...
+      </div>
+    </div>
+  );
+}
+
 // Memoized message bubble — prevents DOM replacement during streaming,
 // which preserves text selection for copy/paste
 const MessageBubble = memo(function MessageBubble({ msg }: { msg: ChatMessage }) {
@@ -162,6 +176,7 @@ export default function GridChat() {
   const [loading, setLoading] = useState(false);
   const [streamingContent, setStreamingContent] = useState('');
   const [streamingTools, setStreamingTools] = useState<ToolCallMeta[]>([]);
+  const [pendingTool, setPendingTool] = useState<PendingToolCall | null>(null);
   const [suggestions, setSuggestions] = useState(() => getSuggestedQuestions());
   const messageListRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -230,6 +245,7 @@ export default function GridChat() {
       setLoading(true);
       setStreamingContent('');
       setStreamingTools([]);
+      setPendingTool(null);
 
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto';
@@ -241,6 +257,18 @@ export default function GridChat() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ messages: updatedMessages }),
         });
+
+        if (response.status === 429) {
+          const data = await response.json();
+          const rateLimitMsg: ChatMessage = {
+            id: generateId(),
+            role: 'assistant',
+            content: data.message || 'Rate limit reached. Please try again later.',
+            timestamp: Date.now(),
+          };
+          setMessages((prev) => [...prev, rateLimitMsg]);
+          return;
+        }
 
         if (!response.ok) {
           throw new Error(`API error: ${response.status}`);
@@ -274,6 +302,7 @@ export default function GridChat() {
                 case 'tool_use':
                   pendingSql = event.sql;
                   pendingStrategy = event.strategy || '';
+                  setPendingTool({ sql: pendingSql, strategy: pendingStrategy });
                   break;
                 case 'tool_result':
                   tools.push({
@@ -284,6 +313,7 @@ export default function GridChat() {
                   });
                   pendingSql = '';
                   pendingStrategy = '';
+                  setPendingTool(null);
                   setStreamingTools([...tools]);
                   break;
                 case 'text_delta':
@@ -321,6 +351,7 @@ export default function GridChat() {
         setLoading(false);
         setStreamingContent('');
         setStreamingTools([]);
+        setPendingTool(null);
       }
     },
     [messages, loading]
@@ -357,11 +388,12 @@ export default function GridChat() {
       ))}
 
       {/* Streaming state */}
-      {loading && (streamingContent || streamingTools.length > 0) && (
+      {loading && (streamingContent || streamingTools.length > 0 || pendingTool) && (
         <div className={styles.assistantMessage}>
           {streamingTools.map((tc, i) => (
             <ToolBadge key={i} meta={tc} />
           ))}
+          {pendingTool && <PendingToolBadge pending={pendingTool} />}
           {streamingContent && (
             <div
               className={styles.messageContent}
@@ -372,7 +404,7 @@ export default function GridChat() {
       )}
 
       {/* Typing indicator */}
-      {loading && !streamingContent && streamingTools.length === 0 && (
+      {loading && !streamingContent && streamingTools.length === 0 && !pendingTool && (
         <div className={styles.typing}>
           <div className={styles.typingDot} />
           <div className={styles.typingDot} />

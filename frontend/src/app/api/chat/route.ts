@@ -1,8 +1,8 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { query } from '@/lib/clickhouse';
+import { query, execute } from '@/lib/clickhouse';
 import { buildSystemPrompt } from '@/lib/chat/system-prompt';
 import { validateSQL } from '@/lib/chat/sql-safety';
-import type { ChatMessage, ToolCallMeta } from '@/lib/chat/types';
+import type { ChatMessage } from '@/lib/chat/types';
 
 const anthropic = new Anthropic();
 
@@ -27,176 +27,209 @@ const TOOL_DEFINITION: Anthropic.Tool = {
 
 const MAX_TOOL_ITERATIONS = 5;
 const MAX_RESULT_ROWS = 100;
+const RATE_LIMIT_PER_DAY = 5;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const COOKIE_NAME = 'gridgpt-uid';
+const COOKIE_MAX_AGE = 31536000; // 1 year
+
+function makeCookie(uid: string): string {
+  return `${COOKIE_NAME}=${uid}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${COOKIE_MAX_AGE}`;
+}
 
 export async function POST(request: Request) {
+  // Parse body first — errors here return 500 JSON (pre-stream)
+  let body: { messages?: ChatMessage[] };
   try {
-    const body = await request.json();
-    const messages: ChatMessage[] = body.messages ?? [];
-
-    // Convert chat messages to Anthropic format (last 20)
-    const recentMessages = messages.slice(-20);
-    const anthropicMessages: Anthropic.MessageParam[] = recentMessages.map((m) => ({
-      role: m.role,
-      content: m.content,
-    }));
-
-    const systemPrompt = buildSystemPrompt();
-    const toolCallsMeta: ToolCallMeta[] = [];
-
-    // Phase A: Tool loop (non-streaming)
-    let currentMessages = [...anthropicMessages];
-    let finalText = '';
-    let iterations = 0;
-
-    while (iterations < MAX_TOOL_ITERATIONS) {
-      const response = await anthropic.messages.create({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 2048,
-        system: systemPrompt,
-        messages: currentMessages,
-        tools: [TOOL_DEFINITION],
-      });
-
-      if (response.stop_reason === 'tool_use') {
-        // Find tool use blocks
-        const assistantContent = response.content;
-        const toolUseBlock = assistantContent.find(
-          (block): block is Anthropic.ContentBlockParam & { type: 'tool_use'; id: string; name: string; input: Record<string, string> } =>
-            block.type === 'tool_use'
-        );
-
-        if (!toolUseBlock) break;
-
-        const sql = toolUseBlock.input.sql;
-        const strategy = toolUseBlock.input.strategy || '';
-        const startTime = Date.now();
-
-        // Validate SQL
-        const validation = validateSQL(sql);
-        let toolResult: string;
-        let rowCount = 0;
-
-        if (!validation.valid) {
-          toolResult = JSON.stringify({ error: validation.error });
-        } else {
-          try {
-            const rows = await query<Record<string, unknown>>(sql);
-            rowCount = rows.length;
-            const truncated = rows.slice(0, MAX_RESULT_ROWS);
-            toolResult = JSON.stringify({
-              data: truncated,
-              rowCount: rows.length,
-              truncated: rows.length > MAX_RESULT_ROWS,
-            });
-          } catch (err: unknown) {
-            const message = err instanceof Error ? err.message : String(err);
-            toolResult = JSON.stringify({ error: message });
-          }
-        }
-
-        const durationMs = Date.now() - startTime;
-        toolCallsMeta.push({ sql, strategy, rowCount, durationMs });
-
-        // Add assistant response and tool result to conversation
-        currentMessages = [
-          ...currentMessages,
-          { role: 'assistant' as const, content: assistantContent },
-          {
-            role: 'user' as const,
-            content: [
-              {
-                type: 'tool_result' as const,
-                tool_use_id: toolUseBlock.id,
-                content: toolResult,
-              },
-            ],
-          },
-        ];
-
-        iterations++;
-      } else {
-        // Extract final text
-        for (const block of response.content) {
-          if (block.type === 'text') {
-            finalText += block.text;
-          }
-        }
-        break;
-      }
-    }
-
-    // If we hit max iterations, do one final call without tools
-    if (iterations >= MAX_TOOL_ITERATIONS && !finalText) {
-      const finalResponse = await anthropic.messages.create({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1024,
-        system: systemPrompt,
-        messages: [
-          ...currentMessages,
-          { role: 'user' as const, content: 'Please summarize your findings based on the data collected so far.' },
-        ],
-      });
-      for (const block of finalResponse.content) {
-        if (block.type === 'text') {
-          finalText += block.text;
-        }
-      }
-    }
-
-    // Phase B: Stream response as SSE
-    const encoder = new TextEncoder();
-
-    const stream = new ReadableStream({
-      start(controller) {
-        const send = (event: Record<string, unknown>) => {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
-        };
-
-        // Emit tool call events
-        for (const meta of toolCallsMeta) {
-          send({ type: 'tool_use', name: 'query_clickhouse', sql: meta.sql, strategy: meta.strategy });
-          send({ type: 'tool_result', rowCount: meta.rowCount, durationMs: meta.durationMs });
-        }
-
-        // Emit text in chunks with simulated streaming
-        const chunkSize = 20;
-        let offset = 0;
-
-        const emitChunks = () => {
-          const batchEnd = Math.min(offset + chunkSize * 5, finalText.length);
-
-          while (offset < batchEnd) {
-            const end = Math.min(offset + chunkSize, finalText.length);
-            const chunk = finalText.slice(offset, end);
-            send({ type: 'text_delta', content: chunk });
-            offset = end;
-          }
-
-          if (offset < finalText.length) {
-            setTimeout(emitChunks, 15);
-          } else {
-            send({ type: 'done' });
-            controller.close();
-          }
-        };
-
-        emitChunks();
-      },
-    });
-
-    return new Response(stream, {
-      headers: {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        Connection: 'keep-alive',
-      },
-    });
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error('Chat API error:', message);
-    return new Response(JSON.stringify({ error: message }), {
-      status: 500,
+    body = await request.json();
+  } catch {
+    return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
+      status: 400,
       headers: { 'Content-Type': 'application/json' },
     });
   }
+
+  const messages: ChatMessage[] = body.messages ?? [];
+
+  // --- Rate limiting (cookie-based, fail-open) ---
+  const cookieHeader = request.headers.get('cookie') || '';
+  const existingUid = cookieHeader
+    .split(';')
+    .map((c) => c.trim())
+    .find((c) => c.startsWith(`${COOKIE_NAME}=`))
+    ?.split('=')[1];
+
+  const uid = existingUid && UUID_RE.test(existingUid) ? existingUid : crypto.randomUUID();
+
+  try {
+    const rows = await query<{ cnt: number }>(
+      `SELECT count() AS cnt FROM ieso.chat_rate_limits WHERE user_id = '${uid}' AND requested_at >= now() - INTERVAL 1 DAY`
+    );
+    const count = rows[0]?.cnt ?? 0;
+
+    if (count >= RATE_LIMIT_PER_DAY) {
+      return new Response(
+        JSON.stringify({
+          error: 'rate_limit',
+          message: `You've reached the limit of ${RATE_LIMIT_PER_DAY} questions per day. Come back tomorrow!`,
+        }),
+        {
+          status: 429,
+          headers: {
+            'Content-Type': 'application/json',
+            'Set-Cookie': makeCookie(uid),
+          },
+        }
+      );
+    }
+
+    await execute(`INSERT INTO ieso.chat_rate_limits (user_id) VALUES ('${uid}')`);
+  } catch (err) {
+    // Fail-open: if rate limit check fails, proceed anyway
+    console.error('Rate limit check failed (proceeding):', err instanceof Error ? err.message : err);
+  }
+
+  // --- Progressive SSE streaming ---
+  const recentMessages = messages.slice(-20);
+  const anthropicMessages: Anthropic.MessageParam[] = recentMessages.map((m) => ({
+    role: m.role,
+    content: m.content,
+  }));
+
+  const systemPrompt = buildSystemPrompt();
+  const encoder = new TextEncoder();
+
+  const stream = new ReadableStream({
+    async start(controller) {
+      const send = (event: Record<string, unknown>) => {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+      };
+
+      try {
+        let currentMessages = [...anthropicMessages];
+        let finalText = '';
+        let iterations = 0;
+
+        while (iterations < MAX_TOOL_ITERATIONS) {
+          const response = await anthropic.messages.create({
+            model: 'claude-sonnet-4-20250514',
+            max_tokens: 2048,
+            system: systemPrompt,
+            messages: currentMessages,
+            tools: [TOOL_DEFINITION],
+          });
+
+          if (response.stop_reason === 'tool_use') {
+            const assistantContent = response.content;
+            const toolUseBlock = assistantContent.find(
+              (block): block is Anthropic.ContentBlockParam & { type: 'tool_use'; id: string; name: string; input: Record<string, string> } =>
+                block.type === 'tool_use'
+            );
+
+            if (!toolUseBlock) break;
+
+            const sql = toolUseBlock.input.sql;
+            const strategy = toolUseBlock.input.strategy || '';
+
+            // Emit tool_use immediately — user sees strategy + spinner
+            send({ type: 'tool_use', name: 'query_clickhouse', sql, strategy });
+
+            const startTime = Date.now();
+            const validation = validateSQL(sql);
+            let toolResult: string;
+            let rowCount = 0;
+
+            if (!validation.valid) {
+              toolResult = JSON.stringify({ error: validation.error });
+            } else {
+              try {
+                const rows = await query<Record<string, unknown>>(sql);
+                rowCount = rows.length;
+                const truncated = rows.slice(0, MAX_RESULT_ROWS);
+                toolResult = JSON.stringify({
+                  data: truncated,
+                  rowCount: rows.length,
+                  truncated: rows.length > MAX_RESULT_ROWS,
+                });
+              } catch (err: unknown) {
+                const message = err instanceof Error ? err.message : String(err);
+                toolResult = JSON.stringify({ error: message });
+              }
+            }
+
+            const durationMs = Date.now() - startTime;
+
+            // Emit tool_result immediately — user sees row count + duration
+            send({ type: 'tool_result', rowCount, durationMs });
+
+            currentMessages = [
+              ...currentMessages,
+              { role: 'assistant' as const, content: assistantContent },
+              {
+                role: 'user' as const,
+                content: [
+                  {
+                    type: 'tool_result' as const,
+                    tool_use_id: toolUseBlock.id,
+                    content: toolResult,
+                  },
+                ],
+              },
+            ];
+
+            iterations++;
+          } else {
+            for (const block of response.content) {
+              if (block.type === 'text') {
+                finalText += block.text;
+              }
+            }
+            break;
+          }
+        }
+
+        // If we hit max iterations, do one final call without tools
+        if (iterations >= MAX_TOOL_ITERATIONS && !finalText) {
+          const finalResponse = await anthropic.messages.create({
+            model: 'claude-sonnet-4-20250514',
+            max_tokens: 1024,
+            system: systemPrompt,
+            messages: [
+              ...currentMessages,
+              { role: 'user' as const, content: 'Please summarize your findings based on the data collected so far.' },
+            ],
+          });
+          for (const block of finalResponse.content) {
+            if (block.type === 'text') {
+              finalText += block.text;
+            }
+          }
+        }
+
+        // Stream final text in chunks
+        const chunkSize = 20;
+        for (let offset = 0; offset < finalText.length; offset += chunkSize) {
+          const chunk = finalText.slice(offset, offset + chunkSize);
+          send({ type: 'text_delta', content: chunk });
+        }
+
+        send({ type: 'done' });
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error('Chat stream error:', message);
+        send({ type: 'text_delta', content: `Error: ${message}` });
+        send({ type: 'done' });
+      } finally {
+        controller.close();
+      }
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      'Set-Cookie': makeCookie(uid),
+    },
+  });
 }

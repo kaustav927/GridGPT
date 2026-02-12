@@ -19,6 +19,11 @@ export type SSEEvent =
   | { type: 'text_delta'; content: string }
   | { type: 'done' };
 
+export interface PendingToolCall {
+  sql: string;
+  strategy: string;
+}
+
 export interface ChatRequest {
   messages: ChatMessage[];
 }
