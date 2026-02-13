@@ -6,6 +6,7 @@ export const DOMAIN_KNOWLEDGE = `
 - IMPORTANT — Timestamp storage is NOT uniform across tables:
   - MOST tables (v_zonal_prices, v_zonal_demand, v_generator_output, v_fuel_mix, v_adequacy, v_da_ozp) store timestamps in EST (as naive DateTime, no timezone metadata). These timestamps are ALREADY in EST — do NOT subtract 5 hours.
   - EXCEPTION: v_intertie_flow stores timestamps in UTC. For this table only, subtract 5 to display EST: subtractHours(timestamp, 5).
+  - EXCEPTION: v_weather stores timestamps in UTC AND contains forecast data up to 24h into the future. For current weather, always filter valid_timestamp <= now() (UTC). For display, convert to EST: subtractHours(valid_timestamp, 5).
 - ClickHouse now() returns UTC. To get "now in EST": subtractHours(now(), 5).
 - For time-range filters on EST tables: WHERE timestamp > subtractHours(now(), 5) - INTERVAL 1 HOUR (NOT now() - INTERVAL 1 HOUR, which is 5 hours ahead of the data).
 - For time-range filters on v_intertie_flow (UTC): WHERE timestamp > now() - INTERVAL 1 HOUR.
@@ -63,6 +64,14 @@ Example: For Feb 06, 2026 Hour 15 prices → https://reports-public.ieso.ca/publ
 - DO NOT compute "hourly prices" by averaging 12 five-minute RT intervals. That was the legacy HOEP method and is no longer how Ontario prices work.
 - When comparing prices across days or hours, use DA-OZP (v_da_ozp) as the authoritative source.
 - For DA-vs-RT spread analysis, compare DA-OZP to the avg of RT 5-min prices in the same hour.
+
+### Day-Ahead delivery_date Interpretation Rules
+- CRITICAL: delivery_date in v_da_ozp is the date electricity is DELIVERED, not when the report was published.
+- "Today's DA prices" / "current prices" / "what's the price?" → delivery_date = toDate(subtractHours(now(), 5)). These are the settlement prices IN EFFECT right now (published yesterday ~1:30 PM).
+- "Tomorrow's DA prices" / "DA forecast just published" / "the latest DA report" → delivery_date = toDate(subtractHours(now(), 5)) + 1. Only available after ~1:30 PM EST today.
+- For DA vs RT spread: ALWAYS use delivery_date = toDate(subtractHours(now(), 5)) — comparing today's day-ahead forecast against today's real-time actuals for the same delivery period.
+- NEVER use delivery_date = today + 1 unless the user explicitly says "tomorrow" or "next delivery day".
+- Default to today's delivery_date when ambiguous — users asking about "prices" want what's currently in effect.
 
 ### Price Interpretation
 - DA-OZP (settlement price): Normal range $5-50/MWh. High (>$100) indicates forecast supply stress.

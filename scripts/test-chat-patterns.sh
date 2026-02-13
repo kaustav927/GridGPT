@@ -9,12 +9,24 @@
 
 set -euo pipefail
 
+CH_URL="${CLICKHOUSE_URL:-}"
+CH_USER="${CLICKHOUSE_USER:-default}"
+CH_PASS="${CLICKHOUSE_PASSWORD:-}"
+
+run_query() {
+  if [ -n "$CH_URL" ]; then
+    curl -s -u "$CH_USER:$CH_PASS" "$CH_URL/?default_format=TabSeparated" --data-binary "$1"
+  else
+    docker exec clickhouse clickhouse-client -q "$1" 2>/dev/null
+  fi
+}
+
 PASS=0; FAIL=0; WARN=0
 
 run_test() {
   local name="$1" query="$2" min_rows="${3:-1}" known_issue="${4:-}"
   local count
-  count=$(docker exec clickhouse clickhouse-client -q "$query" 2>/dev/null | wc -l | tr -d ' ')
+  count=$(run_query "$query" | wc -l | tr -d ' ')
   if [ "$count" -ge "$min_rows" ]; then
     echo "  PASS  $name ($count rows)"
     PASS=$((PASS + 1))
@@ -84,6 +96,16 @@ run_test "Pattern 10: DA Today vs Yesterday" \
 run_test "Pattern 11: Week-over-Week WIND" \
   "SELECT toDate(timestamp) AS day, round(avg(output_mw), 1) FROM ieso.v_fuel_mix WHERE timestamp > subtractHours(now(), 5) - INTERVAL 14 DAY AND fuel_type = 'WIND' GROUP BY day ORDER BY day LIMIT 500" \
   7
+
+# Pattern 12: Adequacy / supply-demand margin
+run_test "Pattern 12: Adequacy Today" \
+  "SELECT delivery_hour, round(forecast_demand_mw, 0), round(forecast_supply_mw, 0), round(forecast_supply_mw - forecast_demand_mw, 0) FROM ieso.v_adequacy WHERE delivery_date = toDate(subtractHours(now(), 5)) LIMIT 50" \
+  10
+
+# Pattern 13: Intertie flows — Quebec & New York
+run_test "Pattern 13: QC & NY Interties" \
+  "SELECT intertie, round(argMax(actual_mw, timestamp), 1), round(argMax(scheduled_mw, timestamp), 1) FROM ieso.v_intertie_flow WHERE timestamp > now() - INTERVAL 2 HOUR AND (startsWith(intertie, 'PQ') OR intertie = 'NEW-YORK') GROUP BY intertie LIMIT 20" \
+  2
 
 echo ""
 echo "Results: $PASS passed, $FAIL failed, $WARN warnings"

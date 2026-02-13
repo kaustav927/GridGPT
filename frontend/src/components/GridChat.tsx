@@ -452,6 +452,12 @@ export default function GridChat() {
             <ToolBadge key={i} meta={tc} />
           ))}
           {pendingTool && <PendingToolBadge pending={pendingTool} />}
+          {!pendingTool && !streamingContent && (
+            <div className={styles.thinkingIndicator}>
+              <span className={styles.toolSpinner} />
+              Analyzing...
+            </div>
+          )}
           {streamingContent && (
             <div
               className={styles.messageContent}
@@ -462,7 +468,7 @@ export default function GridChat() {
       )}
 
       {/* Typing indicator */}
-      {loading && !streamingContent && !pendingTool && (
+      {loading && !streamingContent && !pendingTool && streamingTools.length === 0 && (
         <div className={styles.typing}>
           <div className={styles.typingDot} />
           <div className={styles.typingDot} />

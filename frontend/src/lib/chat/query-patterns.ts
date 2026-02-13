@@ -2,9 +2,9 @@ export const QUERY_PATTERNS = `
 ## Validated Query Patterns
 All queries use deduplicated v_* views — no manual dedup subqueries needed.
 IMPORTANT: Most tables store timestamps in EST (not UTC). Use subtractHours(now(), 5) as "current EST time" for filters.
-Exception: v_intertie_flow stores timestamps in UTC — use now() directly for that table.
+Exception: v_intertie_flow stores timestamps in UTC — use now() directly for filtering that table, but always convert to ET (subtractHours(timestamp, 5)) when selecting timestamps for display.
 
-### 1. Current Settlement Prices by Zone (DA-OZP for today)
+### 1. Current Settlement Prices by Zone (DA-OZP, delivery_date = today's EST date)
 SELECT zone, delivery_hour, round(zonal_price, 2) AS da_price
 FROM ieso.v_da_ozp
 WHERE delivery_date = toDate(subtractHours(now(), 5))
@@ -106,7 +106,7 @@ WHERE timestamp > subtractHours(now(), 5) - INTERVAL 7 DAY
 ORDER BY price DESC
 LIMIT 100
 
-### 9. Day-Ahead vs Realtime Price Spread
+### 9. Day-Ahead vs Realtime Price Spread (delivery_date = today's EST date vs today's RT)
 SELECT
   da.zone,
   da.delivery_hour,
@@ -127,7 +127,7 @@ WHERE da.delivery_date = toDate(subtractHours(now(), 5))
 ORDER BY da.zone, da.delivery_hour
 LIMIT 500
 
-### 10. Today vs Yesterday DA Settlement Price Comparison
+### 10. Today vs Yesterday DA Settlement Price Comparison (delivery_date = today and yesterday EST dates)
 SELECT
   zone,
   round(avgIf(zonal_price, period = 'today'), 2) AS today_avg,
@@ -165,4 +165,41 @@ WHERE timestamp > subtractHours(now(), 5) - INTERVAL 14 DAY
 GROUP BY fuel_type, day, period
 ORDER BY day
 LIMIT 500
+
+### 12. Adequacy / Supply-Demand Margin (today's forecast)
+SELECT
+  delivery_hour,
+  round(forecast_demand_mw, 0) AS demand_mw,
+  round(forecast_supply_mw, 0) AS supply_mw,
+  round(forecast_supply_mw - forecast_demand_mw, 0) AS surplus_mw
+FROM ieso.v_adequacy
+WHERE delivery_date = toDate(subtractHours(now(), 5))
+ORDER BY delivery_hour
+LIMIT 50
+
+### 13. Intertie Flows — Quebec & New York Detail (NOTE: v_intertie_flow uses UTC timestamps)
+SELECT
+  intertie,
+  round(argMax(actual_mw, timestamp), 1) AS actual_mw,
+  round(argMax(scheduled_mw, timestamp), 1) AS scheduled_mw
+FROM ieso.v_intertie_flow
+WHERE timestamp > now() - INTERVAL 2 HOUR
+  AND (startsWith(intertie, 'PQ') OR intertie = 'NEW-YORK')
+GROUP BY intertie
+ORDER BY intertie
+LIMIT 20
+
+### 14. Current Weather Across Ontario Zones (NOTE: v_weather uses UTC timestamps — subtract 5h for EST display)
+SELECT
+  subtractHours(valid_timestamp, 5) AS est_time,
+  zone,
+  round(temperature, 1) AS temperature_c,
+  round(wind_speed, 1) AS wind_speed_ms,
+  wind_direction AS wind_dir_deg,
+  cloud_cover AS cloud_pct
+FROM ieso.v_weather
+-- IMPORTANT: v_weather contains forecasts up to 24h ahead. Filter <= now() for observations only.
+WHERE valid_timestamp = (SELECT max(valid_timestamp) FROM ieso.v_weather WHERE valid_timestamp <= now())
+ORDER BY zone
+LIMIT 20
 `;

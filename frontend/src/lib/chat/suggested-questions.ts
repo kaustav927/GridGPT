@@ -2,13 +2,13 @@ const QUESTION_SETS: string[][] = [
   [
     'Why are prices high right now?',
     'What is the current fuel mix?',
-    'Which zones have highest demand?',
+    'Is there enough supply to meet forecast demand?',
     'Are we importing or exporting power?',
   ],
   [
     'Compare today\'s prices to yesterday',
-    'What\'s driving demand this afternoon?',
-    'Are there any generator outages?',
+    'Which zone has the cheapest day-ahead price today?',
+    'How much power are we trading with Quebec and New York?',
     'What does the day-ahead market look like?',
   ],
   [

@@ -25,7 +25,7 @@ const TOOL_DEFINITION: Anthropic.Tool = {
   },
 };
 
-const MAX_TOOL_ITERATIONS = 5;
+const MAX_TOOL_ITERATIONS = 3;
 const MAX_RESULT_ROWS = 100;
 const RATE_LIMIT_PER_DAY = 5;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -61,38 +61,40 @@ export async function POST(request: Request) {
   const uid = existingUid && UUID_RE.test(existingUid) ? existingUid : crypto.randomUUID();
   let remaining = -1; // -1 = unknown (rate limit check failed)
 
-  try {
-    const rows = await query<{ cnt: number }>(
-      `SELECT count() AS cnt FROM ieso.chat_rate_limits WHERE user_id = '${uid}' AND requested_at >= now() - INTERVAL 1 DAY`
-    );
-    const count = rows[0]?.cnt ?? 0;
-
-    if (count >= RATE_LIMIT_PER_DAY) {
-      return new Response(
-        JSON.stringify({
-          error: 'rate_limit',
-          message: `You've reached the limit of ${RATE_LIMIT_PER_DAY} questions per day. Come back tomorrow!`,
-          remaining: 0,
-        }),
-        {
-          status: 429,
-          headers: {
-            'Content-Type': 'application/json',
-            'Set-Cookie': makeCookie(uid),
-          },
-        }
+  if (process.env.NODE_ENV === 'production') {
+    try {
+      const rows = await query<{ cnt: number }>(
+        `SELECT count() AS cnt FROM ieso.chat_rate_limits WHERE user_id = '${uid}' AND requested_at >= now() - INTERVAL 1 DAY`
       );
-    }
+      const count = rows[0]?.cnt ?? 0;
 
-    await execute(`INSERT INTO ieso.chat_rate_limits (user_id) VALUES ('${uid}')`);
-    remaining = RATE_LIMIT_PER_DAY - count - 1;
-  } catch (err) {
-    // Fail-open: if rate limit check fails, proceed anyway
-    console.error('Rate limit check failed (proceeding):', err instanceof Error ? err.message : err);
+      if (count >= RATE_LIMIT_PER_DAY) {
+        return new Response(
+          JSON.stringify({
+            error: 'rate_limit',
+            message: `You've reached the limit of ${RATE_LIMIT_PER_DAY} questions per day. Come back tomorrow!`,
+            remaining: 0,
+          }),
+          {
+            status: 429,
+            headers: {
+              'Content-Type': 'application/json',
+              'Set-Cookie': makeCookie(uid),
+            },
+          }
+        );
+      }
+
+      await execute(`INSERT INTO ieso.chat_rate_limits (user_id) VALUES ('${uid}')`);
+      remaining = RATE_LIMIT_PER_DAY - count - 1;
+    } catch (err) {
+      // Fail-open: if rate limit check fails, proceed anyway
+      console.error('Rate limit check failed (proceeding):', err instanceof Error ? err.message : err);
+    }
   }
 
   // --- Progressive SSE streaming ---
-  const recentMessages = messages.slice(-20);
+  const recentMessages = messages.slice(-10);
   const anthropicMessages: Anthropic.MessageParam[] = recentMessages.map((m) => ({
     role: m.role,
     content: m.content,
@@ -114,17 +116,23 @@ export async function POST(request: Request) {
         }
 
         let currentMessages = [...anthropicMessages];
-        let finalText = '';
         let iterations = 0;
 
         while (iterations < MAX_TOOL_ITERATIONS) {
-          const response = await anthropic.messages.create({
+          const apiStream = anthropic.messages.stream({
             model: 'claude-sonnet-4-20250514',
-            max_tokens: 2048,
+            max_tokens: 1024,
             system: systemPrompt,
             messages: currentMessages,
             tools: [TOOL_DEFINITION],
           });
+
+          // Stream text tokens to user in real-time as Claude generates them
+          apiStream.on('text', (text) => {
+            send({ type: 'text_delta', content: text });
+          });
+
+          const response = await apiStream.finalMessage();
 
           if (response.stop_reason === 'tool_use') {
             const assistantContent = response.content;
@@ -186,18 +194,14 @@ export async function POST(request: Request) {
 
             iterations++;
           } else {
-            for (const block of response.content) {
-              if (block.type === 'text') {
-                finalText += block.text;
-              }
-            }
+            // Text already streamed via event handler
             break;
           }
         }
 
-        // If we hit max iterations, do one final call without tools
-        if (iterations >= MAX_TOOL_ITERATIONS && !finalText) {
-          const finalResponse = await anthropic.messages.create({
+        // Fallback: if max iterations hit with no text streamed
+        if (iterations >= MAX_TOOL_ITERATIONS) {
+          const fallbackStream = anthropic.messages.stream({
             model: 'claude-sonnet-4-20250514',
             max_tokens: 1024,
             system: systemPrompt,
@@ -206,18 +210,10 @@ export async function POST(request: Request) {
               { role: 'user' as const, content: 'Please summarize your findings based on the data collected so far.' },
             ],
           });
-          for (const block of finalResponse.content) {
-            if (block.type === 'text') {
-              finalText += block.text;
-            }
-          }
-        }
-
-        // Stream final text in chunks
-        const chunkSize = 20;
-        for (let offset = 0; offset < finalText.length; offset += chunkSize) {
-          const chunk = finalText.slice(offset, offset + chunkSize);
-          send({ type: 'text_delta', content: chunk });
+          fallbackStream.on('text', (text) => {
+            send({ type: 'text_delta', content: text });
+          });
+          await fallbackStream.finalMessage();
         }
 
         send({ type: 'done' });

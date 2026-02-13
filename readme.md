@@ -117,15 +117,15 @@ Grid AI is a [context-grounded](#context-grounded) query assistant that translat
 
 ### Tool Loop
 
-The chat API uses Claude's tool-use capability with a `query_clickhouse` tool. On each turn, the model generates SQL plus a plain-English strategy explanation. The SQL passes through a safety validator (SELECT-only, LIMIT required, no `system.*` tables) before executing against ClickHouse. If the query returns an error or empty results, the model can retry with corrected SQL for up to 5 iterations.
+The chat API uses Claude's tool-use capability with a `query_clickhouse` tool. On each turn, the model generates SQL plus a plain-English strategy explanation. The SQL passes through a safety validator (SELECT-only, LIMIT required, no `system.*` tables) before executing against ClickHouse. If the query returns an error or empty results, the model can retry with corrected SQL for up to 3 iterations.
 
 ### SSE Streaming
 
-Results stream to the browser via [Server-Sent Events](#sse). The frontend receives four event types:
+Results stream to the browser via [Server-Sent Events](#sse) with true token-level streaming from the Claude API. The frontend receives four event types:
 
 - `tool_use` — SQL query and strategy explanation
 - `tool_result` — row count and execution duration
-- `text_delta` — chunked natural language response
+- `text_delta` — real-time token-level streaming from the Claude API
 - `done` — stream completion signal
 
 The Grid AI component renders tool badges, strategy text, markdown-formatted answers, and persists conversations in localStorage.
@@ -135,9 +135,9 @@ User Question (natural language)
     ▼
 Context Assembly (schema + domain + patterns + temporal rules)
     ▼
-Claude API (claude-sonnet-4, query_clickhouse tool)
+Claude API Streaming (claude-sonnet-4, query_clickhouse tool)
     ▼
-Tool Loop (up to 5 iterations):
+Tool Loop (up to 3 iterations):
     ├─ Generate SQL + strategy
     ├─ Safety validation (SELECT-only, LIMIT, no system.*)
     ├─ Execute against ClickHouse
@@ -146,7 +146,7 @@ Tool Loop (up to 5 iterations):
 SSE Stream → GridChat Component
     ├─ tool_use (SQL + strategy)
     ├─ tool_result (row count + duration)
-    ├─ text_delta (chunked response)
+    ├─ text_delta (token-level streaming)
     └─ done
 ```
 

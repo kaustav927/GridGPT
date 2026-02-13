@@ -41,7 +41,15 @@ export default function PanelWrapper({
 
   return (
     <>
-      <div className={`${styles.card} ${collapsed ? styles.collapsed : ''} ${className || ''}`} style={style}>
+      {/* Dark backdrop when expanded */}
+      {expanded && (
+        <div className={styles.overlay} onClick={toggleExpand} />
+      )}
+
+      <div
+        className={`${styles.card} ${collapsed ? styles.collapsed : ''} ${expanded ? styles.cardExpanded : ''} ${className || ''}`}
+        style={style}
+      >
         {/* Header bar — always visible */}
         <div className={styles.header}>
           <h2 className={styles.title}>{title}</h2>
@@ -50,54 +58,32 @@ export default function PanelWrapper({
               <button
                 className={styles.headerBtn}
                 onClick={toggleExpand}
-                title="Enlarge"
+                title={expanded ? 'Close' : 'Enlarge'}
               >
-                &#x26F6;
+                {expanded ? '\u2715' : '\u26F6'}
               </button>
             )}
-            <button
-              className={styles.headerBtn}
-              onClick={toggleCollapse}
-              title={collapsed ? 'Expand' : 'Collapse'}
-            >
-              <span className={collapsed ? styles.chevronRight : styles.chevronDown}>
-                &#x2039;
-              </span>
-            </button>
+            {!expanded && (
+              <button
+                className={styles.headerBtn}
+                onClick={toggleCollapse}
+                title={collapsed ? 'Expand' : 'Collapse'}
+              >
+                <span className={collapsed ? styles.chevronRight : styles.chevronDown}>
+                  &#x2039;
+                </span>
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Collapsible body */}
-        {!collapsed && !expanded && (
+        {/* Body — children rendered once, never unmounted on expand */}
+        {!collapsed && (
           <div className={`${styles.body} ${bodyClassName || ''}`} style={bodyStyle}>
             {children}
           </div>
         )}
       </div>
-
-      {/* Fullscreen overlay */}
-      {expanded && (
-        <div className={styles.overlay} onClick={toggleExpand}>
-          <div
-            className={styles.expandedCard}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className={styles.header}>
-              <h2 className={styles.title}>{title}</h2>
-              <button
-                className={styles.headerBtn}
-                onClick={toggleExpand}
-                title="Close"
-              >
-                &#x2715;
-              </button>
-            </div>
-            <div className={`${styles.expandedBody} ${bodyClassName || ''}`} style={bodyStyle}>
-              {children}
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 }

@@ -149,6 +149,15 @@
   to { transform: rotate(360deg); }
 }
 
+.thinkingIndicator {
+  font-size: 10px;
+  color: var(--text-muted);
+  padding: 4px 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 /* Markdown headings */
 .mdH2 {
   font-size: 12px;

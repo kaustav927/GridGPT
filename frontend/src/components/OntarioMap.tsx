@@ -80,6 +80,33 @@ const snapToGdpsTime = (date: Date | null): string | undefined => {
   return d.toISOString().split(".")[0] + "Z";
 };
 
+// Bounds covering Ontario + surrounding region to avoid global tile requests
+const WMS_BOUNDS: [[number, number], [number, number]] = [
+  [40, -96],
+  [57, -65],
+];
+const WMS_URL = "https://geo.weather.gc.ca/geomet";
+const WMS_CONFIGS = {
+  temp: { layers: "GDPS.ETA_TT", opacity: 0.5, zIndex: 100 },
+  cloud: { layers: "GDPS.ETA_NT", opacity: 0.5, zIndex: 90 },
+  precip: { layers: "GDPS.ETA_PR", opacity: 0.6, zIndex: 95 },
+} as const;
+type WmsType = keyof typeof WMS_CONFIGS;
+
+// Generate all GDPS 3-hour time steps within ±12h of now
+const getGdpsTimeSteps = (): string[] => {
+  const now = Date.now();
+  const THREE_H = 3 * 60 * 60 * 1000;
+  const start = Math.floor((now - 12 * 60 * 60 * 1000) / THREE_H) * THREE_H;
+  const end = Math.ceil((now + 12 * 60 * 60 * 1000) / THREE_H) * THREE_H;
+  const steps: string[] = [];
+  for (let t = start; t <= end; t += THREE_H) {
+    const d = new Date(t);
+    steps.push(d.toISOString().split(".")[0] + "Z");
+  }
+  return steps;
+};
+
 interface ZonePriceMap {
   [zone: string]: ZoneData;
 }
@@ -146,18 +173,19 @@ function MapContent({
   const polylineRefsRef = useRef<Map<string, any>>(new Map());
   const tempLayerRef = useRef<L.GeoJSON | null>(null);
   const cloudLayerRef = useRef<L.GeoJSON | null>(null);
-  // WMS layers use double-buffering for smooth time transitions
-  const tempWmsLayerRef = useRef<L.TileLayer | null>(null);
-  const tempWmsBufferRef = useRef<L.TileLayer | null>(null);
-  const cloudWmsLayerRef = useRef<L.TileLayer | null>(null);
-  const cloudWmsBufferRef = useRef<L.TileLayer | null>(null);
-  const precipLayerRef = useRef<L.TileLayer | null>(null);
-  const precipBufferRef = useRef<L.TileLayer | null>(null);
-  // Track current WMS time to avoid unnecessary updates (one per layer type)
-  const tempTimeRef = useRef<string | undefined>(undefined);
-  const cloudTimeRef = useRef<string | undefined>(undefined);
-  const precipTimeRef = useRef<string | undefined>(undefined);
+  // WMS preload cache: all GDPS time steps × 3 layer types, keyed by ISO time string
+  const wmsCacheRef = useRef<Record<WmsType, Map<string, L.TileLayer>>>({
+    temp: new Map(),
+    cloud: new Map(),
+    precip: new Map(),
+  });
+  const activeWmsTimeRef = useRef<Record<WmsType, string | null>>({
+    temp: null,
+    cloud: null,
+    precip: null,
+  });
   const animationFrameRef = useRef<number | null>(null);
+  const ontarioBoundsRef = useRef<L.LatLngBounds | null>(null);
   const [mapReady, setMapReady] = useState(false);
 
   useEffect(() => {
@@ -201,9 +229,10 @@ function MapContent({
 
       // Compute Ontario bounds from GeoJSON for initial view (without adding the layer)
       const boundsLayer = L.geoJSON(ontarioZones as GeoJSON.FeatureCollection);
+      ontarioBoundsRef.current = boundsLayer.getBounds();
       // Asymmetric padding: more on bottom so southern Ontario isn't cut off by time scrubber
       const isMobile = window.innerWidth <= 900;
-      map.fitBounds(boundsLayer.getBounds(), {
+      map.fitBounds(ontarioBoundsRef.current, {
         paddingTopLeft: isMobile ? [40, 30] : [10, 10],
         paddingBottomRight: isMobile ? [40, 120] : [10, 60],
       });
@@ -214,7 +243,18 @@ function MapContent({
 
     initMap();
 
+    // Watch for container resize (e.g. PanelWrapper expand/collapse)
+    const resizeObserver = new ResizeObserver(() => {
+      if (mapRef.current) {
+        mapRef.current.invalidateSize();
+      }
+    });
+    if (containerRef.current) {
+      resizeObserver.observe(containerRef.current);
+    }
+
     return () => {
+      resizeObserver.disconnect();
       if (mapRef.current) {
         mapRef.current.remove();
         mapRef.current = null;
@@ -715,72 +755,121 @@ function MapContent({
     };
   }, [mapReady, showTransmission]);
 
-  // Manage temperature overlay layer - using ECCC WMS with crossfade for smooth transitions
+  // WMS Preload Effect — create all GDPS time step layers on mount
   useEffect(() => {
     if (!mapReady || !mapRef.current) return;
     const map = mapRef.current;
 
-    if (!showTemp) {
-      // Remove all layers when disabled
-      if (tempWmsLayerRef.current) {
-        map.removeLayer(tempWmsLayerRef.current);
-        tempWmsLayerRef.current = null;
-      }
-      if (tempWmsBufferRef.current) {
-        map.removeLayer(tempWmsBufferRef.current);
-        tempWmsBufferRef.current = null;
-      }
-      if (tempLayerRef.current) {
-        map.removeLayer(tempLayerRef.current);
-        tempLayerRef.current = null;
-      }
-      tempTimeRef.current = undefined;
-      return;
-    }
-
-    const timeStr = snapToGdpsTime(scrubTime);
-
-    // Skip if time hasn't changed
-    if (timeStr === tempTimeRef.current && tempWmsLayerRef.current) {
-      return;
-    }
-
-    const updateLayer = async () => {
+    const preload = async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const L = (await import("leaflet")) as any;
+      const timeSteps = getGdpsTimeSteps();
+      const types: WmsType[] = ["temp", "cloud", "precip"];
+      const staggerDelays: ReturnType<typeof setTimeout>[] = [];
+      let idx = 0;
 
-      // Store old layer ref BEFORE creating new one
-      const oldLayer = tempWmsLayerRef.current;
+      for (const type of types) {
+        const cfg = WMS_CONFIGS[type];
+        for (let i = 0; i < timeSteps.length; i++) {
+          const timeStr = timeSteps[i];
+          const create = () => {
+            // Guard: map may have unmounted during staggered creation
+            if (!mapRef.current) return;
+            const layer = L.tileLayer.wms(WMS_URL, {
+              layers: cfg.layers,
+              format: "image/png",
+              transparent: true,
+              opacity: 0, // All start hidden
+              attribution: '&copy; <a href="https://weather.gc.ca/">ECCC</a>',
+              bounds: L.latLngBounds(WMS_BOUNDS[0], WMS_BOUNDS[1]),
+              time: timeStr,
+            });
+            layer.setZIndex(cfg.zIndex);
+            layer.addTo(map);
+            wmsCacheRef.current[type].set(timeStr, layer);
+          };
 
-      const wmsOptions: Record<string, unknown> = {
-        layers: "GDPS.ETA_TT",
-        format: "image/png",
-        transparent: true,
-        opacity: 0.5, // Start at target opacity (no fade to avoid race conditions)
-        attribution: '&copy; <a href="https://weather.gc.ca/">ECCC</a>',
-      };
-      if (timeStr) {
-        wmsOptions.time = timeStr;
+          // First 3 time steps per type load immediately, rest staggered
+          if (i < 3) {
+            create();
+          } else {
+            const delay = (idx - types.length * 3 + 9) * 150;
+            staggerDelays.push(setTimeout(create, Math.max(0, delay)));
+          }
+          idx++;
+        }
       }
 
-      // Create new layer and add to map
-      const newLayer = L.tileLayer.wms(
-        "https://geo.weather.gc.ca/geomet",
-        wmsOptions,
-      );
-      newLayer.setZIndex(100);
-      newLayer.addTo(map);
-      tempWmsLayerRef.current = newLayer;
-      tempTimeRef.current = timeStr;
-
-      // Remove old layer AFTER new one is added (instant swap, no animation)
-      if (oldLayer && map.hasLayer(oldLayer)) {
-        map.removeLayer(oldLayer);
-      }
+      return staggerDelays;
     };
 
-    updateLayer();
-  }, [mapReady, showTemp, scrubTime]);
+    // Capture ref for cleanup (React ESLint rule)
+    const cacheRef = wmsCacheRef.current;
+
+    let staggerTimers: ReturnType<typeof setTimeout>[] | undefined;
+    preload().then((timers) => {
+      staggerTimers = timers;
+    });
+
+    return () => {
+      // Clear pending stagger timers
+      if (staggerTimers) {
+        staggerTimers.forEach(clearTimeout);
+      }
+      // Remove all cached layers from map and clear caches
+      const allTypes: WmsType[] = ["temp", "cloud", "precip"];
+      for (const type of allTypes) {
+        const cache = cacheRef[type];
+        cache.forEach((layer) => {
+          if (map.hasLayer(layer)) {
+            map.removeLayer(layer);
+          }
+        });
+        cache.clear();
+      }
+      activeWmsTimeRef.current = { temp: null, cloud: null, precip: null };
+    };
+  }, [mapReady]);
+
+  // WMS Visibility Effect — swap opacity based on toggle state and scrub time
+  useEffect(() => {
+    if (!mapReady) return;
+
+    const toggles: Record<WmsType, boolean> = {
+      temp: showTemp,
+      cloud: showCloud,
+      precip: showPrecip,
+    };
+    const types: WmsType[] = ["temp", "cloud", "precip"];
+
+    for (const type of types) {
+      const cache = wmsCacheRef.current[type];
+      if (cache.size === 0) continue; // preload still in progress
+
+      const targetTime = snapToGdpsTime(scrubTime ?? new Date());
+      const isOn = toggles[type];
+
+      // Early exit if nothing changed for this type
+      if (
+        isOn &&
+        targetTime === activeWmsTimeRef.current[type]
+      ) {
+        continue;
+      }
+
+      const cfg = WMS_CONFIGS[type];
+
+      cache.forEach((layer, timeStr) => {
+        if (isOn && timeStr === targetTime) {
+          layer.setOpacity(cfg.opacity);
+        } else {
+          layer.setOpacity(0);
+        }
+      });
+
+      activeWmsTimeRef.current[type] = isOn ? (targetTime ?? null) : null;
+    }
+  }, [mapReady, showTemp, showCloud, showPrecip, scrubTime]);
 
   // Manage temperature zone markers (separate from WMS to avoid flashing)
   useEffect(() => {
@@ -842,72 +931,6 @@ function MapContent({
 
     loadMarkers();
   }, [mapReady, showTemp, weatherData]);
-
-  // Manage cloud cover overlay layer - using ECCC WMS with crossfade
-  useEffect(() => {
-    if (!mapReady || !mapRef.current) return;
-    const map = mapRef.current;
-
-    if (!showCloud) {
-      if (cloudWmsLayerRef.current) {
-        map.removeLayer(cloudWmsLayerRef.current);
-        cloudWmsLayerRef.current = null;
-      }
-      if (cloudWmsBufferRef.current) {
-        map.removeLayer(cloudWmsBufferRef.current);
-        cloudWmsBufferRef.current = null;
-      }
-      if (cloudLayerRef.current) {
-        map.removeLayer(cloudLayerRef.current);
-        cloudLayerRef.current = null;
-      }
-      cloudTimeRef.current = undefined;
-      return;
-    }
-
-    const timeStr = snapToGdpsTime(scrubTime);
-
-    // Skip if time hasn't changed
-    if (timeStr === cloudTimeRef.current && cloudWmsLayerRef.current) {
-      return;
-    }
-
-    const updateLayer = async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const L = (await import("leaflet")) as any;
-
-      // Store old layer ref BEFORE creating new one
-      const oldLayer = cloudWmsLayerRef.current;
-
-      const wmsOptions: Record<string, unknown> = {
-        layers: "GDPS.ETA_NT",
-        format: "image/png",
-        transparent: true,
-        opacity: 0.5, // Start at target opacity (no fade to avoid race conditions)
-        attribution: '&copy; <a href="https://weather.gc.ca/">ECCC</a>',
-      };
-      if (timeStr) {
-        wmsOptions.time = timeStr;
-      }
-
-      // Create new layer and add to map
-      const newLayer = L.tileLayer.wms(
-        "https://geo.weather.gc.ca/geomet",
-        wmsOptions,
-      );
-      newLayer.setZIndex(90);
-      newLayer.addTo(map);
-      cloudWmsLayerRef.current = newLayer;
-      cloudTimeRef.current = timeStr;
-
-      // Remove old layer AFTER new one is added (instant swap, no animation)
-      if (oldLayer && map.hasLayer(oldLayer)) {
-        map.removeLayer(oldLayer);
-      }
-    };
-
-    updateLayer();
-  }, [mapReady, showCloud, scrubTime]);
 
   // Manage cloud zone markers
   useEffect(() => {
@@ -981,68 +1004,6 @@ function MapContent({
 
     loadMarkers();
   }, [mapReady, showCloud, weatherData]);
-
-  // Manage precipitation forecast WMS layer with crossfade
-  useEffect(() => {
-    if (!mapReady || !mapRef.current) return;
-    const map = mapRef.current;
-
-    if (!showPrecip) {
-      if (precipLayerRef.current) {
-        map.removeLayer(precipLayerRef.current);
-        precipLayerRef.current = null;
-      }
-      if (precipBufferRef.current) {
-        map.removeLayer(precipBufferRef.current);
-        precipBufferRef.current = null;
-      }
-      precipTimeRef.current = undefined;
-      return;
-    }
-
-    const timeStr = snapToGdpsTime(scrubTime);
-
-    // Skip if time hasn't changed
-    if (timeStr === precipTimeRef.current && precipLayerRef.current) {
-      return;
-    }
-
-    const updateLayer = async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const L = (await import("leaflet")) as any;
-
-      // Store old layer ref BEFORE creating new one
-      const oldLayer = precipLayerRef.current;
-
-      const wmsOptions: Record<string, unknown> = {
-        layers: "GDPS.ETA_PR",
-        format: "image/png",
-        transparent: true,
-        opacity: 0.6, // Start at target opacity (no fade to avoid race conditions)
-        attribution: '&copy; <a href="https://weather.gc.ca/">ECCC</a>',
-      };
-      if (timeStr) {
-        wmsOptions.time = timeStr;
-      }
-
-      // Create new layer and add to map
-      const newLayer = L.tileLayer.wms(
-        "https://geo.weather.gc.ca/geomet",
-        wmsOptions,
-      );
-      newLayer.setZIndex(95);
-      newLayer.addTo(map);
-      precipLayerRef.current = newLayer;
-      precipTimeRef.current = timeStr;
-
-      // Remove old layer AFTER new one is added (instant swap, no animation)
-      if (oldLayer && map.hasLayer(oldLayer)) {
-        map.removeLayer(oldLayer);
-      }
-    };
-
-    updateLayer();
-  }, [mapReady, showPrecip, scrubTime]);
 
   return (
     <div
@@ -1539,10 +1500,6 @@ export default function OntarioMap({ onZoneSelect, selectedZone }: Props) {
         }
         .leaflet-interactive {
           cursor: pointer;
-        }
-        /* Smooth opacity transitions for WMS layers */
-        .leaflet-tile-pane .leaflet-layer {
-          transition: opacity 0.3s ease-in-out;
         }
       `}</style>
     </>

@@ -455,17 +455,17 @@ export default function AboutPage() {
             tool. On each turn, the model generates SQL plus a plain-English strategy explanation.
             The SQL passes through a safety validator (SELECT-only, LIMIT required, no system table
             access) before executing against ClickHouse. If the query returns an error or empty
-            results, the model can retry with corrected SQL for up to 5 iterations.
+            results, the model can retry with corrected SQL for up to 3 iterations.
           </p>
 
           <h3 className={styles.subsectionTitle}>SSE Streaming</h3>
           <p className={styles.prose}>
-            Results stream to the browser via <a href="#sse">Server-Sent Events</a>. The frontend
-            receives four event types: <code>tool_use</code> (SQL + strategy),{' '}
-            <code>tool_result</code> (row count + duration), <code>text_delta</code> (chunked
-            natural language response), and <code>done</code>. The Grid AI component renders tool
-            badges, strategy text, markdown-formatted answers, and persists conversations in
-            localStorage.
+            Results stream to the browser via <a href="#sse">Server-Sent Events</a> with true
+            token-level streaming from the Claude API. The frontend receives four event types:{' '}
+            <code>tool_use</code> (SQL + strategy), <code>tool_result</code> (row count + duration),{' '}
+            <code>text_delta</code> (real-time token-level streaming), and <code>done</code>. The
+            Grid AI component renders tool badges, strategy text, markdown-formatted answers, and
+            persists conversations in localStorage.
           </p>
 
           {/* Grid AI Architecture Diagram */}
@@ -516,7 +516,7 @@ export default function AboutPage() {
                   <span className={styles.archNodeDesc}>
                     claude-sonnet-4 with query_clickhouse tool definition
                   </span>
-                  <span className={styles.archNodeTech}>max_tokens: 2048, tool loop up to 5 iterations</span>
+                  <span className={styles.archNodeTech}>max_tokens: 1024, tool loop up to 3 iterations</span>
                 </div>
               </div>
 
