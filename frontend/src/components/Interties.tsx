@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+
 import { Icon } from '@blueprintjs/core';
 
 interface IntertieRow {
@@ -71,8 +72,26 @@ export default function Interties() {
 
   const hasNetFlow = Math.abs(netFlow) > 1;
 
+  // Compute most recent timestamp across all interties
+  const latestUpdate = useMemo(() => {
+    const timestamps = Object.values(flowData)
+      .map(e => e.lastUpdated)
+      .filter(Boolean);
+    if (timestamps.length === 0) return null;
+    return timestamps.sort().pop()!;
+  }, [flowData]);
+
   return (
     <>
+      {latestUpdate && (
+        <div style={{ fontSize: '9px', color: '#8B949E', marginBottom: '8px', fontVariantNumeric: 'tabular-nums' }}>
+          As of {new Date(latestUpdate.replace(' ', 'T') + 'Z').toLocaleString('en-GB', {
+            day: '2-digit', month: '2-digit', year: 'numeric',
+            hour: '2-digit', minute: '2-digit', hour12: false,
+            timeZone: 'America/Toronto',
+          })} EST
+        </div>
+      )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
         {DISPLAY_ORDER.map(({ key, label }) => {
           // API convention: positive = export from Ontario, negative = import to Ontario

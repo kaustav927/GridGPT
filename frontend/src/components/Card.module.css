@@ -82,6 +82,11 @@
     font-size: 9px;
   }
 
+  .toggleBtn {
+    padding: 2px 6px;
+    font-size: 9px;
+  }
+
   .weatherBar {
     gap: 5px;
   }
@@ -105,6 +110,11 @@
   .weatherBtn {
     padding: 3px 6px;
     gap: 4px;
+    font-size: 9px;
+  }
+
+  .toggleBtn {
+    padding: 2px 5px;
     font-size: 9px;
   }
 
@@ -134,9 +144,49 @@
     font-size: 8px;
   }
 
+  .toggleBtn {
+    padding: 2px 4px;
+    font-size: 8px;
+  }
+
   .weatherBar {
     gap: 3px;
   }
+}
+
+/* Shared toggle button (used by MarketChart, FuelMix, etc.) */
+.toggleBtn {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  font-size: 10px;
+  cursor: pointer;
+  border-radius: 0;
+  font-family: 'JetBrains Mono', monospace;
+  white-space: nowrap;
+}
+.toggleBtn:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+.toggleBtnActive {
+  composes: toggleBtn;
+  background: rgba(88, 166, 255, 0.15);
+  border-color: #58A6FF;
+  color: #58A6FF;
+}
+.toggleBtnDisabled {
+  composes: toggleBtn;
+  color: #484F58;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+.toggleBtnDisabled:hover {
+  background: var(--bg-primary);
+  color: #484F58;
 }
 
 /* MarketChart legend + chart area for mobile reordering */
@@ -167,6 +217,11 @@
   .weatherBtn {
     padding: 5px 10px;
     gap: 6px;
+    font-size: 10px;
+  }
+
+  .toggleBtn {
+    padding: 3px 8px;
     font-size: 10px;
   }
 

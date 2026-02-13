@@ -44,6 +44,14 @@
   white-space: nowrap;
 }
 
+.infoIcon {
+  font-size: 10px;
+  color: var(--text-secondary);
+  cursor: help;
+  opacity: 0.6;
+}
+.infoIcon:hover { opacity: 1; }
+
 .headerButtons {
   display: flex;
   gap: 6px;

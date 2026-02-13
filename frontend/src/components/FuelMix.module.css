@@ -43,31 +43,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Toggle button group */
-.toggleGroup {
-  background: #21262D !important;
-}
-
-.toggleButton {
-  font-size: 10px !important;
-  padding: 2px 8px !important;
-  min-height: 22px !important;
-  color: var(--text-secondary) !important;
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
-}
-
-.toggleButton:hover {
-  background: #30363D !important;
-  color: var(--text-primary) !important;
-}
-
-.toggleButton:global(.bp5-active) {
-  background: #30363D !important;
-  color: var(--text-primary) !important;
-}
-
 .loading {
   display: flex;
   justify-content: center;
@@ -293,7 +268,6 @@
   .utilizationCell { gap: 4px; }
   .utilizationBar { min-width: 30px; }
   .utilizationText { min-width: 24px; font-size: 8px; }
-  .toggleButton { font-size: 9px !important; padding: 2px 6px !important; }
   .flowLabel { font-size: 8px; }
   .flowValue { font-size: 8px; }
   .flowDot { width: 6px; height: 6px; }
@@ -314,7 +288,6 @@
   .utilizationText { min-width: 32px; font-size: 10px; }
   .headerRow { flex-direction: column; align-items: flex-start; }
   .headerRight { width: 100%; justify-content: space-between; }
-  .toggleButton { font-size: 10px !important; padding: 2px 8px !important; }
   .flowLabel { font-size: 10px; }
   .flowValue { font-size: 10px; }
   .flowDot { width: 8px; height: 8px; }

@@ -298,7 +298,7 @@ export default function GenerationByResource() {
               className={styles.fuelTotal}
               style={{ color: section.color }}
             >
-              {Math.round(total).toLocaleString()}
+              {Math.round(total).toLocaleString()} MW
             </span>
           </div>
           <div

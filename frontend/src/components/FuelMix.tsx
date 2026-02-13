@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
-import { Spinner, HTMLTable, ButtonGroup, Button } from '@blueprintjs/core';
+import { Spinner, HTMLTable } from '@blueprintjs/core';
 import { ResponsivePie } from '@nivo/pie';
 import {
   RadarChart,
@@ -9,10 +9,12 @@ import {
   PolarGrid,
   PolarAngleAxis,
   ResponsiveContainer,
-  Tooltip,
+  Tooltip as RechartsTooltip,
   Dot,
 } from 'recharts';
 import styles from './FuelMix.module.css';
+import cardStyles from './Card.module.css';
+import Tooltip from './Tooltip';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -560,7 +562,7 @@ export default function FuelMix() {
             strokeWidth={2}
             dot={renderCustomDot}
           />
-          <Tooltip
+          <RechartsTooltip
             contentStyle={{
               background: '#161B22',
               border: '1px solid #30363D',
@@ -589,32 +591,32 @@ export default function FuelMix() {
   return (
     <>
       <div className={styles.headerRight}>
-        <ButtonGroup minimal className={styles.toggleGroup}>
-          <Button
-            small
-            active={viewMode === 'donut'}
-            onClick={() => setViewMode('donut')}
-            className={styles.toggleButton}
-          >
-            Donut
-          </Button>
-          <Button
-            small
-            active={viewMode === 'table'}
-            onClick={() => setViewMode('table')}
-            className={styles.toggleButton}
-          >
-            Table
-          </Button>
-          <Button
-            small
-            active={viewMode === 'radar'}
-            onClick={() => setViewMode('radar')}
-            className={styles.toggleButton}
-          >
-            Radar
-          </Button>
-        </ButtonGroup>
+        <div style={{ display: 'flex', gap: '4px' }}>
+          <Tooltip content="Pie chart showing generation by fuel type" position="bottom">
+            <button
+              className={viewMode === 'donut' ? cardStyles.toggleBtnActive : cardStyles.toggleBtn}
+              onClick={() => setViewMode('donut')}
+            >
+              Donut
+            </button>
+          </Tooltip>
+          <Tooltip content="Detailed table with output, capacity, and utilization" position="bottom">
+            <button
+              className={viewMode === 'table' ? cardStyles.toggleBtnActive : cardStyles.toggleBtn}
+              onClick={() => setViewMode('table')}
+            >
+              Table
+            </button>
+          </Tooltip>
+          <Tooltip content="Radar chart comparing fuel type contributions" position="bottom">
+            <button
+              className={viewMode === 'radar' ? cardStyles.toggleBtnActive : cardStyles.toggleBtn}
+              onClick={() => setViewMode('radar')}
+            >
+              Radar
+            </button>
+          </Tooltip>
+        </div>
         {dataTimestamp && (
           <span className={styles.asOfTime}>As of {formatAsOfTime(dataTimestamp)}</span>
         )}

@@ -115,10 +115,10 @@ export default function Dashboard() {
       <div className={styles.mainContent}>
         {/* Left Panel */}
         <div className={styles.leftPanel}>
-          <PanelWrapper title="FUEL MIX" className={styles.panelFuelMix} bodyClassName={styles.fuelMixBody}>
+          <PanelWrapper title="FUEL MIX" className={styles.panelFuelMix} bodyClassName={styles.fuelMixBody} headerTooltip={<div>Generation output by fuel type.<br/><a href="https://reports-public.ieso.ca/public/GenOutputbyFuelHourly/" target="_blank" rel="noopener noreferrer" style={{color:'#58A6FF'}}>IESO Fuel Mix Report →</a></div>}>
             <FuelMix />
           </PanelWrapper>
-          <PanelWrapper title="GENERATION BY RESOURCE" className={styles.panelGenByResource}>
+          <PanelWrapper title="GENERATION BY RESOURCE" className={styles.panelGenByResource} headerTooltip={<div>Output per generating station.<br/><a href="https://reports-public.ieso.ca/public/GenOutputCapability/" target="_blank" rel="noopener noreferrer" style={{color:'#58A6FF'}}>IESO Generator Output Report →</a></div>}>
             <GenerationByResource />
           </PanelWrapper>
         </div>
@@ -130,23 +130,24 @@ export default function Dashboard() {
             className={styles.panelMap}
             bodyClassName={styles.mapPanelBody}
             bodyStyle={{ aspectRatio: '1 / 0.85' }}
+            headerTooltip={<div>Zonal prices, generation sites, interties, and weather overlays.<br/><a href="https://reports-public.ieso.ca/public/RealtimeZonalEnergyPrices/" target="_blank" rel="noopener noreferrer" style={{color:'#58A6FF'}}>IESO Zonal Prices Report →</a></div>}
           >
             <OntarioMap
               selectedZone={selectedZone}
               onZoneSelect={handleZoneSelect}
             />
           </PanelWrapper>
-          <PanelWrapper title="MARKET OVERVIEW" className={styles.panelMarketOverview} bodyClassName={styles.chartPanelBody}>
+          <PanelWrapper title="MARKET OVERVIEW" className={styles.panelMarketOverview} bodyClassName={styles.chartPanelBody} headerTooltip={<div>Supply, demand, and price across Ontario.<br/><a href="https://reports-public.ieso.ca/public/RealtimeDemandZonal/" target="_blank" rel="noopener noreferrer" style={{color:'#58A6FF'}}>IESO Demand Report →</a><br/><a href="https://reports-public.ieso.ca/public/DAHourlyOntarioZonalPrice/" target="_blank" rel="noopener noreferrer" style={{color:'#58A6FF'}}>IESO Day-Ahead Price Report →</a></div>}>
             <MarketChart />
           </PanelWrapper>
         </div>
 
         {/* Right Panel */}
         <div className={styles.rightPanel}>
-          <PanelWrapper title="GRID AI" className={styles.panelGridAI} bodyClassName={styles.chatPanelBody}>
+          <PanelWrapper title="GRID AI" className={styles.panelGridAI} bodyClassName={styles.chatPanelBody} headerTooltip={<div>AI assistant that answers questions about the grid using natural language.</div>}>
             <GridChat />
           </PanelWrapper>
-          <PanelWrapper title="INTERTIES" className={styles.panelInterties}>
+          <PanelWrapper title="INTERTIES" className={styles.panelInterties} headerTooltip={<div>Power flows between Ontario and neighbouring regions.<br/><a href="https://reports-public.ieso.ca/public/IntertieScheduleFlow/" target="_blank" rel="noopener noreferrer" style={{color:'#58A6FF'}}>IESO Intertie Flow Report →</a></div>}>
             <Interties />
           </PanelWrapper>
         </div>

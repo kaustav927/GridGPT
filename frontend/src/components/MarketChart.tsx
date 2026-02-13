@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { ButtonGroup, Button, Switch, Tooltip } from '@blueprintjs/core';
+import Tooltip from './Tooltip';
 import {
   ComposedChart,
   Line,
@@ -184,7 +184,12 @@ const LegendItem = ({ color, label, value, tooltip, isPrice, isDotted, isVisible
 const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
   if (!active || !payload || !payload.length || label === undefined) return null;
 
-  const timeStr = formatTimeLabel(label);
+  const d = new Date(label);
+  const timeStr = d.toLocaleString('en-GB', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+    timeZone: 'America/Toronto',
+  }) + ' EST';
 
   return (
     <div
@@ -480,76 +485,65 @@ export default function MarketChart() {
         {/* Row 1: Date + Controls + Peak Info */}
         <div className={styles.controlsRow1} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '10px', color: '#8B949E' }}>{chartTitle}</span>
-            <ButtonGroup minimal>
-              {(['1H', 'Today'] as TimeRange[]).map((range) => (
-                <Button
-                  key={range}
-                  text={range}
-                  active={timeRange === range}
-                  onClick={() => setTimeRange(range)}
-                  style={{
-                    fontSize: '10px',
-                    padding: '2px 8px',
-                    minHeight: 'auto',
-                    background: timeRange === range ? '#30363D' : 'transparent',
-                    color: timeRange === range ? '#E6EDF3' : '#8B949E',
-                  }}
-                />
-              ))}
-            </ButtonGroup>
-            <Switch
-              checked={showDayAhead}
-              onChange={(e) => setShowDayAhead((e.target as HTMLInputElement).checked)}
-              innerLabel="Proj"
-              innerLabelChecked="Proj"
-              style={{ marginBottom: 0, fontSize: '10px' }}
-            />
-            {showDayAhead && (
-              <ButtonGroup minimal>
-                <Tooltip
-                  content="Current day forecast (Day D)"
-                  placement="bottom"
-                  minimal
+            <span style={{ fontSize: '12px', color: '#E6EDF3', fontWeight: 600 }}>{chartTitle}</span>
+            <div style={{ display: 'flex', gap: '4px' }}>
+              <Tooltip content="Last 60 minutes of grid activity" position="bottom">
+                <button
+                  className={timeRange === '1H' ? styles.toggleBtnActive : styles.toggleBtn}
+                  onClick={() => setTimeRange('1H')}
                 >
-                  <Button
-                    text="D"
-                    active={forecastTarget === 'today'}
+                  1H
+                </button>
+              </Tooltip>
+              <Tooltip content="Full day view from midnight to midnight (EST)" position="bottom">
+                <button
+                  className={timeRange === 'Today' ? styles.toggleBtnActive : styles.toggleBtn}
+                  onClick={() => setTimeRange('Today')}
+                >
+                  Day
+                </button>
+              </Tooltip>
+            </div>
+            <Tooltip content="Show the Day-Ahead Market forecast — IESO's projected supply, demand, and price for the rest of the day" position="bottom">
+              <button
+                className={showDayAhead ? styles.toggleBtnActive : styles.toggleBtn}
+                onClick={() => setShowDayAhead(v => !v)}
+              >
+                Forecast
+              </button>
+            </Tooltip>
+            {showDayAhead && (
+              <div style={{ display: 'flex', gap: '4px' }}>
+                <Tooltip content="View today's forecasted supply, demand, and price" position="bottom">
+                  <button
+                    className={forecastTarget === 'today' ? styles.toggleBtnActive : styles.toggleBtn}
                     onClick={() => setForecastTarget('today')}
-                    style={{
-                      fontSize: '9px',
-                      padding: '2px 6px',
-                      minHeight: 'auto',
-                      background: forecastTarget === 'today' ? '#30363D' : 'transparent',
-                      color: forecastTarget === 'today' ? '#E6EDF3' : '#8B949E',
-                    }}
-                  />
+                  >
+                    Today
+                  </button>
                 </Tooltip>
                 <Tooltip
                   content={
                     isTomorrowAvailable
-                      ? "Next day forecast (Day D+1)"
-                      : "D+1 forecast available after 13:00 ET"
+                      ? "View tomorrow's forecasted supply, demand, and price"
+                      : "Tomorrow's forecast is available after 1:30 PM"
                   }
-                  placement="bottom"
-                  minimal
+                  position="bottom"
                 >
-                  <Button
-                    text="D+1"
-                    active={forecastTarget === 'tomorrow'}
+                  <button
+                    className={
+                      !isTomorrowAvailable
+                        ? styles.toggleBtnDisabled
+                        : forecastTarget === 'tomorrow'
+                          ? styles.toggleBtnActive
+                          : styles.toggleBtn
+                    }
                     onClick={() => isTomorrowAvailable && setForecastTarget('tomorrow')}
-                    disabled={!isTomorrowAvailable}
-                    style={{
-                      fontSize: '9px',
-                      padding: '2px 6px',
-                      minHeight: 'auto',
-                      background: forecastTarget === 'tomorrow' ? '#30363D' : 'transparent',
-                      color: !isTomorrowAvailable ? '#484F58' : (forecastTarget === 'tomorrow' ? '#E6EDF3' : '#8B949E'),
-                      cursor: isTomorrowAvailable ? 'pointer' : 'not-allowed',
-                    }}
-                  />
+                  >
+                    Tomorrow
+                  </button>
                 </Tooltip>
-              </ButtonGroup>
+              </div>
             )}
             {showDayAhead && forecastTarget === 'tomorrow' && !hasDaData && (
               <span style={{ color: '#D29922', fontSize: '9px' }}>

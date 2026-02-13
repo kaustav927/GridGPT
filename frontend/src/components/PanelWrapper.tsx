@@ -2,12 +2,15 @@
 
 import { useState, useCallback, ReactNode } from 'react';
 import styles from './PanelWrapper.module.css';
+import Tooltip from './Tooltip';
 
 interface PanelWrapperProps {
   title: string;
   children: ReactNode;
   defaultCollapsed?: boolean;
   hideExpand?: boolean;
+  /** Tooltip shown via info icon next to title */
+  headerTooltip?: ReactNode;
   /** Extra class on the outer card */
   className?: string;
   /** Extra class on the body area */
@@ -23,6 +26,7 @@ export default function PanelWrapper({
   children,
   defaultCollapsed = false,
   hideExpand = false,
+  headerTooltip,
   className,
   bodyClassName,
   style,
@@ -52,7 +56,14 @@ export default function PanelWrapper({
       >
         {/* Header bar — always visible */}
         <div className={styles.header}>
-          <h2 className={styles.title}>{title}</h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <h2 className={styles.title}>{title}</h2>
+            {headerTooltip && (
+              <Tooltip content={headerTooltip} position="bottom">
+                <span className={styles.infoIcon}>ℹ</span>
+              </Tooltip>
+            )}
+          </div>
           <div className={styles.headerButtons}>
             {!hideExpand && (
               <button

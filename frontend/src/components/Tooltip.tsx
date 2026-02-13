@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, type ReactNode } from 'react';
+import { useState, useRef, useEffect, useCallback, type ReactNode } from 'react';
 
 interface TooltipProps {
   /** Content shown inside the tooltip panel */
@@ -14,12 +14,35 @@ interface TooltipProps {
 /**
  * Reusable tooltip styled to match the Palantir-inspired map tooltips.
  * Renders a dark panel with monospace font, 1px border, and sharp corners.
+ * Supports interactive content (links) — tooltip stays visible when hovered.
  */
 export default function Tooltip({ content, children, position = 'bottom' }: TooltipProps) {
   const [visible, setVisible] = useState(false);
   const triggerRef = useRef<HTMLDivElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
+  const hideTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [coords, setCoords] = useState<{ left: number; top: number }>({ left: 0, top: 0 });
+
+  const clearHideTimeout = useCallback(() => {
+    if (hideTimeout.current) {
+      clearTimeout(hideTimeout.current);
+      hideTimeout.current = null;
+    }
+  }, []);
+
+  const scheduleHide = useCallback(() => {
+    clearHideTimeout();
+    hideTimeout.current = setTimeout(() => setVisible(false), 150);
+  }, [clearHideTimeout]);
+
+  const handleShow = useCallback(() => {
+    clearHideTimeout();
+    setVisible(true);
+  }, [clearHideTimeout]);
+
+  useEffect(() => {
+    return () => clearHideTimeout();
+  }, [clearHideTimeout]);
 
   useEffect(() => {
     if (!visible || !triggerRef.current || !tooltipRef.current) return;
@@ -54,8 +77,8 @@ export default function Tooltip({ content, children, position = 'bottom' }: Tool
     <>
       <div
         ref={triggerRef}
-        onMouseEnter={() => setVisible(true)}
-        onMouseLeave={() => setVisible(false)}
+        onMouseEnter={handleShow}
+        onMouseLeave={scheduleHide}
         style={{ display: 'inline-flex' }}
       >
         {children}
@@ -63,6 +86,8 @@ export default function Tooltip({ content, children, position = 'bottom' }: Tool
       {visible && (
         <div
           ref={tooltipRef}
+          onMouseEnter={handleShow}
+          onMouseLeave={scheduleHide}
           style={{
             position: 'fixed',
             left: coords.left,
@@ -74,7 +99,6 @@ export default function Tooltip({ content, children, position = 'bottom' }: Tool
             background: '#161B22',
             border: '1px solid #30363D',
             color: '#E6EDF3',
-            pointerEvents: 'none',
             whiteSpace: 'nowrap',
           }}
         >
