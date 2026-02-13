@@ -19,6 +19,8 @@ interface PanelWrapperProps {
   style?: React.CSSProperties;
   /** Extra inline style on the body area */
   bodyStyle?: React.CSSProperties;
+  /** data-tour attribute for tutorial tour targeting */
+  dataTour?: string;
 }
 
 export default function PanelWrapper({
@@ -31,6 +33,7 @@ export default function PanelWrapper({
   bodyClassName,
   style,
   bodyStyle,
+  dataTour,
 }: PanelWrapperProps) {
   const [collapsed, setCollapsed] = useState(defaultCollapsed);
   const [expanded, setExpanded] = useState(false);
@@ -53,6 +56,7 @@ export default function PanelWrapper({
       <div
         className={`${styles.card} ${collapsed ? styles.collapsed : ''} ${expanded ? styles.cardExpanded : ''} ${className || ''}`}
         style={style}
+        data-tour={dataTour}
       >
         {/* Header bar — always visible */}
         <div className={styles.header}>

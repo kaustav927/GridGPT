@@ -99,7 +99,8 @@ export default function Tooltip({ content, children, position = 'bottom' }: Tool
             background: '#161B22',
             border: '1px solid #30363D',
             color: '#E6EDF3',
-            whiteSpace: 'nowrap',
+            maxWidth: '280px',
+            whiteSpace: 'normal',
           }}
         >
           {content}

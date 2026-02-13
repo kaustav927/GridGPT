@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Icon } from '@blueprintjs/core';
 import Footer from '@/components/Footer';
 import styles from './about.module.css';
@@ -73,6 +74,16 @@ export default function AboutPage() {
 
       {/* Content */}
       <main className={styles.content}>
+        <div style={{ width: '100%', maxWidth: '960px', margin: '0 auto 24px', border: '1px solid var(--border-color)', borderRadius: '6px', overflow: 'hidden' }}>
+          <Image
+            src="/hero-screenshot.png"
+            alt="GridGPT Dashboard — real-time Ontario electricity grid monitoring"
+            width={960}
+            height={540}
+            style={{ width: '100%', height: 'auto', display: 'block' }}
+            priority
+          />
+        </div>
         <h1 className={styles.pageTitle}>About GridGPT</h1>
         <p className={styles.byline}>By Kaustav Sharma</p>
         <div className={styles.badgeRow}>

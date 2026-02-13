@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { Icon } from '@blueprintjs/core';
 
 interface IntertieRow {
   flow_group: string;
@@ -120,10 +119,10 @@ export default function Interties() {
               <span>{label}</span>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 {hasFlow && isExport && (
-                  <Icon icon="arrow-right" size={12} color="#3FB950" />
+                  <span style={{ color: '#3FB950', fontSize: '14px', fontWeight: 700, lineHeight: 1 }}>›</span>
                 )}
                 {hasFlow && isImport && (
-                  <Icon icon="arrow-left" size={12} color="#F85149" />
+                  <span style={{ color: '#F85149', fontSize: '14px', fontWeight: 700, lineHeight: 1 }}>‹</span>
                 )}
                 <span
                   style={{
@@ -155,10 +154,10 @@ export default function Interties() {
           NET FLOW
         </div>
         <div style={{
-          fontSize: '16px',
+          fontSize: '22px',
           fontWeight: 600,
           fontVariantNumeric: 'tabular-nums',
-          color: !hasNetFlow ? '#8B949E' : netFlow >= 0 ? '#3FB950' : '#F85149'
+          color: !hasNetFlow ? '#8B949E' : netFlow >= 0 ? '#3FB950' : '#F85149',
         }}>
           {hasNetFlow ? (netFlow >= 0 ? '+' : '') : ''}{Math.round(netFlow)} MW
         </div>

@@ -159,6 +159,19 @@ export default function GenerationByResource() {
   const [viewportWidth, setViewportWidth] = useState(
     typeof window !== "undefined" ? window.innerWidth : 1920,
   );
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
+
+  const toggleSection = useCallback((sectionId: string) => {
+    setCollapsedSections((prev: Set<string>) => {
+      const next = new Set(prev);
+      if (next.has(sectionId)) {
+        next.delete(sectionId);
+      } else {
+        next.add(sectionId);
+      }
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     const handleResize = () => setViewportWidth(window.innerWidth);
@@ -279,44 +292,53 @@ export default function GenerationByResource() {
     </div>
   ) : (
     <div className={styles.content}>
-      {visibleSections.map(({ section, plants, total }) => (
-        <div key={section.id} className={styles.fuelSection}>
-          <div
-            className={styles.sectionHeader}
-            style={{
-              background: section.bgColor,
-              borderLeft: `3px solid ${section.color}`,
-            }}
-          >
-            <span
-              className={styles.fuelLabel}
-              style={{ color: section.color }}
+      {visibleSections.map(({ section, plants, total }) => {
+        const isCollapsed = collapsedSections.has(section.id);
+        return (
+          <div key={section.id} className={styles.fuelSection}>
+            <div
+              className={styles.sectionHeader}
+              style={{
+                background: section.bgColor,
+                borderLeft: `3px solid ${section.color}`,
+              }}
+              onClick={() => toggleSection(section.id)}
             >
-              {section.label}
-            </span>
-            <span
-              className={styles.fuelTotal}
-              style={{ color: section.color }}
-            >
-              {Math.round(total).toLocaleString()} MW
-            </span>
+              <span
+                className={styles.fuelLabel}
+                style={{ color: section.color }}
+              >
+                <span className={isCollapsed ? styles.chevronCollapsed : styles.chevronExpanded}>
+                  &#x25BC;
+                </span>
+                {section.label}
+              </span>
+              <span
+                className={styles.fuelTotal}
+                style={{ color: section.color }}
+              >
+                {Math.round(total).toLocaleString()} MW
+              </span>
+            </div>
+            {!isCollapsed && (
+              <div
+                className={
+                  plants.length <= 2 ? styles.plantGridTwo : styles.plantGrid
+                }
+              >
+                {plants.map((plant) => (
+                  <PlantChart
+                    key={plant.name}
+                    plant={plant}
+                    color={section.color}
+                    hideYAxis={viewportWidth <= 1024 && viewportWidth > 900}
+                  />
+                ))}
+              </div>
+            )}
           </div>
-          <div
-            className={
-              plants.length <= 2 ? styles.plantGridTwo : styles.plantGrid
-            }
-          >
-            {plants.map((plant) => (
-              <PlantChart
-                key={plant.name}
-                plant={plant}
-                color={section.color}
-                hideYAxis={viewportWidth <= 1024 && viewportWidth > 900}
-              />
-            ))}
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
