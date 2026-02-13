@@ -107,7 +107,8 @@ function formatAsOfTime(timestamp: string): string {
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,
-  });
+    timeZone: 'America/Toronto',
+  }) + ' EST';
 }
 
 // Nivo theme for Palantir dark style
@@ -427,9 +428,16 @@ export default function FuelMix() {
       {/* Output label below chart (2 lines like radar) */}
       <div className={styles.outputLabel}>
         <span className={styles.outputLabelText}>{displayLabel}</span>
-        <span className={styles.outputLabelValue}>
-          ~{Math.round(displayValue).toLocaleString()} MW
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span className={styles.outputLabelValue}>
+            ~{Math.round(displayValue).toLocaleString()} MW
+          </span>
+          {!selectedFuel && (
+            <Tooltip content="IESO-registered generators only — excludes embedded generation (rooftop solar, small plants) included in Market Overview supply." position="top">
+              <span style={{ fontSize: '11px', color: '#8B949E', cursor: 'help', opacity: 0.6 }}>ℹ</span>
+            </Tooltip>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -581,9 +589,16 @@ export default function FuelMix() {
       {/* Output label below radar */}
       <div className={styles.outputLabel}>
         <span className={styles.outputLabelText}>{displayLabel}</span>
-        <span className={styles.outputLabelValue}>
-          ~{Math.round(displayValue).toLocaleString()} MW
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span className={styles.outputLabelValue}>
+            ~{Math.round(displayValue).toLocaleString()} MW
+          </span>
+          {!selectedFuel && (
+            <Tooltip content="IESO-registered generators only — excludes embedded generation (rooftop solar, small plants) included in Market Overview supply." position="top">
+              <span style={{ fontSize: '11px', color: '#8B949E', cursor: 'help', opacity: 0.6 }}>ℹ</span>
+            </Tooltip>
+          )}
+        </div>
       </div>
     </div>
   );

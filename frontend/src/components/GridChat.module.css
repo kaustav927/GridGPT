@@ -318,13 +318,16 @@
 
 .chipEdit {
   flex-shrink: 0;
-  font-size: 10px;
+  font-size: 18px;
   color: var(--text-muted);
-  padding: 0 2px;
+  padding: 4px 6px;
+  border-radius: 2px;
+  transition: all 0.15s;
 }
 
 .chipEdit:hover {
   color: var(--accent-blue);
+  background: rgba(88, 166, 255, 0.12);
 }
 
 /* Input Area */

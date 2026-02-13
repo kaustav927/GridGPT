@@ -12,15 +12,26 @@ import Interties from '@/components/Interties';
 import GridChat from '@/components/GridChat';
 import PanelWrapper from '@/components/PanelWrapper';
 import Footer from '@/components/Footer';
+import TutorialTour from '@/components/TutorialTour';
 
 export default function Dashboard() {
   const [currentTime, setCurrentTime] = useState<Date | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [selectedZone, setSelectedZone] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [showTour, setShowTour] = useState(false);
 
   const handleZoneSelect = useCallback((zone: string | null) => {
     setSelectedZone(zone);
+  }, []);
+
+  const handleDismissTour = useCallback(() => {
+    setShowTour(false);
+    try { localStorage.setItem('gridgpt-tour-completed', '1'); } catch {}
+  }, []);
+
+  const handleRestartTour = useCallback(() => {
+    setShowTour(true);
   }, []);
 
   useEffect(() => {
@@ -28,6 +39,15 @@ export default function Dashboard() {
     setLastRefresh(new Date());
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
+  }, []);
+
+  // Auto-trigger tour for first-time visitors
+  useEffect(() => {
+    const completed = localStorage.getItem('gridgpt-tour-completed');
+    if (!completed) {
+      const timeout = setTimeout(() => setShowTour(true), 2000);
+      return () => clearTimeout(timeout);
+    }
   }, []);
 
   useEffect(() => {
@@ -69,6 +89,14 @@ export default function Dashboard() {
             >
               GitHub
             </a>
+            <button
+              onClick={handleRestartTour}
+              className={styles.headerNavLink}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: "'JetBrains Mono', monospace", fontSize: '12px' }}
+              title="Take a tour"
+            >
+              Tour
+            </button>
           </nav>
         </div>
         <div className={styles.statusSection}>
@@ -108,6 +136,13 @@ export default function Dashboard() {
           >
             GitHub
           </a>
+          <button
+            className={styles.mobileMenuLink}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', width: '100%', textAlign: 'left', fontFamily: "'JetBrains Mono', monospace" }}
+            onClick={() => { setMenuOpen(false); handleRestartTour(); }}
+          >
+            Tour
+          </button>
         </nav>
       </header>
 
@@ -115,10 +150,10 @@ export default function Dashboard() {
       <div className={styles.mainContent}>
         {/* Left Panel */}
         <div className={styles.leftPanel}>
-          <PanelWrapper title="FUEL MIX" className={styles.panelFuelMix} bodyClassName={styles.fuelMixBody} headerTooltip={<div>Generation output by fuel type.<br/><a href="https://reports-public.ieso.ca/public/GenOutputbyFuelHourly/" target="_blank" rel="noopener noreferrer" style={{color:'#58A6FF'}}>IESO Fuel Mix Report →</a></div>}>
+          <PanelWrapper title="FUEL MIX" className={styles.panelFuelMix} bodyClassName={styles.fuelMixBody} dataTour="fuel-mix" headerTooltip={<div>Generation output by fuel type.<br/><a href="https://reports-public.ieso.ca/public/GenOutputbyFuelHourly/" target="_blank" rel="noopener noreferrer" style={{color:'#58A6FF'}}>IESO Fuel Mix Report →</a></div>}>
             <FuelMix />
           </PanelWrapper>
-          <PanelWrapper title="GENERATION BY RESOURCE" className={styles.panelGenByResource} headerTooltip={<div>Output per generating station.<br/><a href="https://reports-public.ieso.ca/public/GenOutputCapability/" target="_blank" rel="noopener noreferrer" style={{color:'#58A6FF'}}>IESO Generator Output Report →</a></div>}>
+          <PanelWrapper title="GENERATION BY RESOURCE" className={styles.panelGenByResource} dataTour="gen-by-resource" headerTooltip={<div>Output per generating station.<br/><a href="https://reports-public.ieso.ca/public/GenOutputCapability/" target="_blank" rel="noopener noreferrer" style={{color:'#58A6FF'}}>IESO Generator Output Report →</a></div>}>
             <GenerationByResource />
           </PanelWrapper>
         </div>
@@ -130,6 +165,7 @@ export default function Dashboard() {
             className={styles.panelMap}
             bodyClassName={styles.mapPanelBody}
             bodyStyle={{ aspectRatio: '1 / 0.85' }}
+            dataTour="zone-map"
             headerTooltip={<div>Zonal prices, generation sites, interties, and weather overlays.<br/><a href="https://reports-public.ieso.ca/public/RealtimeZonalEnergyPrices/" target="_blank" rel="noopener noreferrer" style={{color:'#58A6FF'}}>IESO Zonal Prices Report →</a></div>}
           >
             <OntarioMap
@@ -137,23 +173,25 @@ export default function Dashboard() {
               onZoneSelect={handleZoneSelect}
             />
           </PanelWrapper>
-          <PanelWrapper title="MARKET OVERVIEW" className={styles.panelMarketOverview} bodyClassName={styles.chartPanelBody} headerTooltip={<div>Supply, demand, and price across Ontario.<br/><a href="https://reports-public.ieso.ca/public/RealtimeDemandZonal/" target="_blank" rel="noopener noreferrer" style={{color:'#58A6FF'}}>IESO Demand Report →</a><br/><a href="https://reports-public.ieso.ca/public/DAHourlyOntarioZonalPrice/" target="_blank" rel="noopener noreferrer" style={{color:'#58A6FF'}}>IESO Day-Ahead Price Report →</a></div>}>
+          <PanelWrapper title="MARKET OVERVIEW" className={styles.panelMarketOverview} bodyClassName={styles.chartPanelBody} dataTour="market-overview" headerTooltip={<div>Supply, demand, and price across Ontario.<br/><a href="https://reports-public.ieso.ca/public/RealtimeDemandZonal/" target="_blank" rel="noopener noreferrer" style={{color:'#58A6FF'}}>IESO Demand Report →</a><br/><a href="https://reports-public.ieso.ca/public/DAHourlyOntarioZonalPrice/" target="_blank" rel="noopener noreferrer" style={{color:'#58A6FF'}}>IESO Day-Ahead Price Report →</a></div>}>
             <MarketChart />
           </PanelWrapper>
         </div>
 
         {/* Right Panel */}
         <div className={styles.rightPanel}>
-          <PanelWrapper title="GRID AI" className={styles.panelGridAI} bodyClassName={styles.chatPanelBody} headerTooltip={<div>AI assistant that answers questions about the grid using natural language.</div>}>
+          <PanelWrapper title="GRID AI" className={styles.panelGridAI} bodyClassName={styles.chatPanelBody} dataTour="grid-ai" headerTooltip={<div>AI assistant that answers questions about the grid using natural language.</div>}>
             <GridChat />
           </PanelWrapper>
-          <PanelWrapper title="INTERTIES" className={styles.panelInterties} headerTooltip={<div>Power flows between Ontario and neighbouring regions.<br/><a href="https://reports-public.ieso.ca/public/IntertieScheduleFlow/" target="_blank" rel="noopener noreferrer" style={{color:'#58A6FF'}}>IESO Intertie Flow Report →</a></div>}>
+          <PanelWrapper title="INTERTIES" className={styles.panelInterties} dataTour="interties" headerTooltip={<div>Power flows between Ontario and neighbouring regions.<br/><a href="https://reports-public.ieso.ca/public/IntertieScheduleFlow/" target="_blank" rel="noopener noreferrer" style={{color:'#58A6FF'}}>IESO Intertie Flow Report →</a></div>}>
             <Interties />
           </PanelWrapper>
         </div>
       </div>
 
       <Footer />
+
+      {showTour && <TutorialTour onDismiss={handleDismissTour} />}
     </div>
   );
 }
