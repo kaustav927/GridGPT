@@ -161,17 +161,19 @@ const LegendItem = ({ color, label, value, tooltip, isPrice, isDotted, isVisible
         <div
           style={{
             position: 'absolute',
-            top: '100%',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            marginTop: '6px',
+            bottom: '100%',
+            left: '0',
+            transform: 'none',
+            marginBottom: '6px',
             padding: '6px 10px',
             background: '#161B22',
             border: '1px solid #30363D',
             fontSize: '9px',
             color: '#8B949E',
-            whiteSpace: 'nowrap',
+            whiteSpace: 'normal',
+            maxWidth: '200px',
             zIndex: 1000,
+            pointerEvents: 'none',
           }}
         >
           {onToggle ? `${tooltip} (click to toggle)` : tooltip}

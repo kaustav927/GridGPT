@@ -164,6 +164,8 @@ function MapContent({
       string,
       {
         data: Record<string, { mw: number; lastUpdated: string }>;
+        daPrices?: Record<string, number>;
+        rtPrices?: Record<string, number>;
         fetchedAt: number;
       }
     >
@@ -185,6 +187,7 @@ function MapContent({
     precip: null,
   });
   const animationFrameRef = useRef<number | null>(null);
+  const intertiePriceRef = useRef<Record<string, number>>({});
   const ontarioBoundsRef = useRef<L.LatLngBounds | null>(null);
   const [mapReady, setMapReady] = useState(false);
 
@@ -244,16 +247,22 @@ function MapContent({
     initMap();
 
     // Watch for container resize (e.g. PanelWrapper expand/collapse)
+    // Debounced to avoid excessive invalidateSize calls during touch gestures
+    let resizeTimeout: ReturnType<typeof setTimeout>;
     const resizeObserver = new ResizeObserver(() => {
-      if (mapRef.current) {
-        mapRef.current.invalidateSize();
-      }
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(() => {
+        if (mapRef.current) {
+          mapRef.current.invalidateSize();
+        }
+      }, 200);
     });
     if (containerRef.current) {
       resizeObserver.observe(containerRef.current);
     }
 
     return () => {
+      clearTimeout(resizeTimeout);
       resizeObserver.disconnect();
       if (mapRef.current) {
         mapRef.current.remove();
@@ -489,7 +498,7 @@ function MapContent({
       INTERTIES.forEach((intertie) => {
         const polyline = L.polyline(intertie.path, {
           color: "#F0883E",
-          weight: 3,
+          weight: 4,
           opacity: 0.5,
           dashArray: "8, 6",
         }).bindTooltip(
@@ -519,6 +528,7 @@ function MapContent({
     async (
       flowByGroup: Record<string, { mw: number; lastUpdated: string }>,
       map: L.Map,
+      isFuture = false,
     ) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const L = (await import("leaflet")) as any;
@@ -527,6 +537,12 @@ function MapContent({
       if (transmissionChevronLayerRef.current) {
         map.removeLayer(transmissionChevronLayerRef.current);
         transmissionChevronLayerRef.current = null;
+      }
+
+      // Future time: no chevrons at all — empty ref stops animation loop
+      if (isFuture) {
+        chevronMarkersRef.current = [];
+        return;
       }
 
       const chevronLayers: L.Layer[] = [];
@@ -595,15 +611,55 @@ function MapContent({
     if (!mapReady || !mapRef.current || !showTransmission) return;
     const map = mapRef.current;
 
+    // Count interties per flowKey for aggregate labeling
+    const intertieCountByKey: Record<string, number> = {};
+    INTERTIES.forEach((i) => {
+      intertieCountByKey[i.flowKey] = (intertieCountByKey[i.flowKey] || 0) + 1;
+    });
+    // IESO has more physical intertie points than map polylines for QC/NY
+    const IESO_INTERTIE_COUNTS: Record<string, number> = {
+      'QUEBEC': 9, 'NEW-YORK': 2, 'MICHIGAN': 1, 'MINNESOTA': 1, 'MANITOBA': 2,
+    };
+
     // Update polyline styles and tooltips in-place via setStyle() and setTooltipContent()
     const updatePolylineStyles = (
       flowByGroup: Record<string, { mw: number; lastUpdated: string }>,
+      isFuture = false,
+      daPrices: Record<string, number> = {},
+      rtPrices: Record<string, number> = {},
     ) => {
+      const prices = isFuture ? daPrices : (Object.keys(rtPrices).length > 0 ? rtPrices : intertiePriceRef.current);
+
       INTERTIES.forEach((intertie) => {
         const polyline = polylineRefsRef.current.get(
           intertie.flowKey + ":" + intertie.name,
         );
         if (!polyline) return;
+
+        // Future time: white dashed lines with DA LMP tooltip only
+        if (isFuture) {
+          const daLmp = prices[intertie.flowKey];
+          const daLmpLine = daLmp !== undefined
+            ? `<div style="color: #D29922; font-weight: 600; margin-top: 2px;">Forecasted Price: $${daLmp.toFixed(2)}</div>`
+            : `<div style="color: #8B949E; margin-top: 2px;">Forecasted Price: N/A</div>`;
+
+          polyline.setStyle({
+            color: '#FFFFFF',
+            opacity: 0.6,
+            dashArray: '6, 6',
+            weight: 4,
+          });
+
+          polyline.setTooltipContent(
+            `<div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 8px; background: #161B22; border: 1px solid #30363D;">
+              <div style="font-weight: 600; color: #E6EDF3; margin-bottom: 4px;">${intertie.name}</div>
+              <div style="color: #8B949E; font-weight: 600;">FORECAST</div>
+              ${daLmpLine}
+              <div style="color: #8B949E; font-size: 9px; margin-top: 2px;">Source: IESO DAHourlyIntertieLMP</div>
+            </div>`,
+          );
+          return;
+        }
 
         const entry = flowByGroup[intertie.flowKey];
         const mw = entry?.mw ?? 0;
@@ -635,16 +691,28 @@ function MapContent({
             )
           : "";
 
+        // LMP price line
+        const lmp = prices[intertie.flowKey];
+        const iesoCount = IESO_INTERTIE_COUNTS[intertie.flowKey] ?? 1;
+        const isAggregate = iesoCount > 1;
+        const lmpLine = lmp !== undefined
+          ? `<div style="color: #D29922; font-weight: 600; margin-top: 2px;">${isAggregate ? "Avg " : ""}Price: $${lmp.toFixed(2)}${isAggregate ? ` (${iesoCount} interties)` : ""}</div>`
+          : "";
+
         polyline.setStyle({
           color: lineColor,
-          opacity: hasFlow ? 0.9 : 0.5,
-          dashArray: hasFlow ? undefined : "8, 6",
+          opacity: hasFlow ? 0.3 : 0.5,
+          dashArray: hasFlow ? "6, 8" : "8, 6",
+          weight: hasFlow ? 2 : 4,
         });
 
         polyline.setTooltipContent(
           `<div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 8px; background: #161B22; border: 1px solid #30363D;">
             <div style="font-weight: 600; color: #E6EDF3; margin-bottom: 4px;">${intertie.name}</div>
-            <div style="color: ${dirColor}; font-weight: 600;">${dirLabel} ${hasFlow ? Math.abs(mw).toFixed(0) + " MW" : ""}</div>
+            <div style="color: ${dirColor}; font-weight: 600;">${dirLabel} ${hasFlow ? (isAggregate ? "Total " : "") + Math.abs(mw).toFixed(0) + " MW" : ""}</div>
+            ${hasFlow ? `<div style="color: #8B949E; font-size: 9px; margin-top: 2px;">Flow: IESO IntertieScheduleFlow</div>` : ""}
+            ${lmpLine}
+            ${lmpLine ? `<div style="color: #8B949E; font-size: 9px; margin-top: 2px;">Price: IESO RealTimeIntertieLMP</div>` : ""}
             ${asOf ? `<div style="color: #8B949E; font-size: 10px; margin-top: 4px;">as of ${asOf}</div>` : ""}
           </div>`,
         );
@@ -653,18 +721,22 @@ function MapContent({
 
     // Snap scrubTime to nearest hour — intertie data is hourly granularity
     const snappedHour = snapToHour(scrubTime);
+    const isFuture = scrubTime ? scrubTime > new Date() : false;
 
-    // Skip fetch if hour hasn't changed
-    if (snappedHour === lastIntertieHourRef.current) return;
-    lastIntertieHourRef.current = snappedHour;
+    // Include future/past in the skip key so crossing NOW triggers a re-fetch
+    const hourKey = (snappedHour || "current") + (isFuture ? ":f" : ":p");
+
+    // Skip fetch if hour + future/past state hasn't changed
+    if (hourKey === lastIntertieHourRef.current) return;
+    lastIntertieHourRef.current = hourKey;
 
     // Check cache (60s TTL)
-    const cacheKey = snappedHour || "current";
+    const cacheKey = (snappedHour || "current") + (isFuture ? ":future" : "");
     const cached = intertieFlowCacheRef.current.get(cacheKey);
     if (cached && Date.now() - cached.fetchedAt < 60000) {
       // Use cached data: update polyline styles in-place + rebuild chevrons
-      updatePolylineStyles(cached.data);
-      rebuildChevrons(cached.data, map);
+      updatePolylineStyles(cached.data, isFuture, cached.daPrices, cached.rtPrices);
+      rebuildChevrons(cached.data, map, isFuture);
       return;
     }
 
@@ -672,36 +744,68 @@ function MapContent({
     const fetchFlowData = async () => {
       const flowByGroup: Record<string, { mw: number; lastUpdated: string }> =
         {};
+      let daPrices: Record<string, number> = {};
+      let rtPrices: Record<string, number> = {};
+
       try {
-        const url = scrubTime
-          ? `/api/interties/at-time?timestamp=${scrubTime.toISOString()}`
-          : "/api/interties";
-        const res = await fetch(url);
-        if (res.ok) {
-          const json = await res.json();
-          for (const row of json.data) {
-            flowByGroup[row.flow_group] = {
-              mw: row.mw ?? row.actual_mw ?? 0,
-              lastUpdated: row.last_updated,
-            };
+        if (isFuture) {
+          // Future: fetch DA intertie LMP only, no flow data
+          const daRes = await fetch(
+            `/api/interties/prices/da?timestamp=${scrubTime!.toISOString()}`,
+          );
+          if (daRes.ok) {
+            const daJson = await daRes.json();
+            for (const row of daJson.data ?? []) {
+              daPrices[row.intertie_zone] = row.lmp;
+            }
+          }
+        } else {
+          // Past/current: fetch flow + RT prices (existing behavior)
+          const flowUrl = scrubTime
+            ? `/api/interties/at-time?timestamp=${scrubTime.toISOString()}`
+            : "/api/interties";
+          const priceUrl = scrubTime
+            ? `/api/interties/prices?timestamp=${scrubTime.toISOString()}`
+            : "/api/interties/prices";
+          const [flowRes, priceRes] = await Promise.all([
+            fetch(flowUrl),
+            fetch(priceUrl),
+          ]);
+          if (flowRes.ok) {
+            const json = await flowRes.json();
+            for (const row of json.data) {
+              flowByGroup[row.flow_group] = {
+                mw: row.mw ?? row.actual_mw ?? 0,
+                lastUpdated: row.last_updated,
+              };
+            }
+          }
+          if (priceRes.ok) {
+            const priceJson = await priceRes.json();
+            for (const row of priceJson.data ?? []) {
+              rtPrices[row.intertie_zone] = row.lmp;
+            }
+            intertiePriceRef.current = rtPrices;
           }
         }
       } catch {
         // Fallback: no flow data
       }
 
-      // Cache the result
+      // Cache the result (include rtPrices so cache hits don't fall back to empty ref)
       intertieFlowCacheRef.current.set(cacheKey, {
         data: flowByGroup,
+        daPrices,
+        rtPrices,
         fetchedAt: Date.now(),
       });
 
       // Update polyline styles in-place (no layer destruction)
-      updatePolylineStyles(flowByGroup);
+      updatePolylineStyles(flowByGroup, isFuture, daPrices, rtPrices);
 
       // Rebuild only the chevron markers
       if (mapRef.current) {
-        rebuildChevrons(flowByGroup, mapRef.current);
+        rebuildChevrons(flowByGroup, mapRef.current, isFuture);
       }
     };
 
@@ -721,8 +825,16 @@ function MapContent({
 
     const cycleDuration = 2000; // ms per full cycle
     const startTime = performance.now();
+    const FRAME_BUDGET = window.innerWidth <= 900 ? 50 : 0; // ~20fps on mobile, uncapped on desktop
+    let lastFrame = 0;
 
     const animate = (now: number) => {
+      if (now - lastFrame < FRAME_BUDGET) {
+        animationFrameRef.current = requestAnimationFrame(animate);
+        return;
+      }
+      lastFrame = now;
+
       const elapsed = now - startTime;
       const markers = chevronMarkersRef.current;
 
@@ -763,7 +875,11 @@ function MapContent({
     const preload = async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const L = (await import("leaflet")) as any;
-      const timeSteps = getGdpsTimeSteps();
+      // On mobile, only preload the current time step (not all ~30) to avoid GPU overload
+      const isMobile = window.innerWidth <= 900;
+      const timeSteps = isMobile
+        ? [snapToGdpsTime(new Date()) || getGdpsTimeSteps()[0]].filter(Boolean) as string[]
+        : getGdpsTimeSteps();
       const types: WmsType[] = ["temp", "cloud", "precip"];
       const staggerDelays: ReturnType<typeof setTimeout>[] = [];
       let idx = 0;

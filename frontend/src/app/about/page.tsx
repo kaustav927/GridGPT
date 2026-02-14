@@ -10,15 +10,15 @@ import styles from './about.module.css';
 const IESO_BASE = 'https://reports-public.ieso.ca/public';
 
 const DATA_SOURCES = [
-  { name: 'RealtimeZonalEnergyPrices', format: 'XML', frequency: '5-min', path: 'RealtimeZonalEnergyPrices' },
-  { name: 'RealtimeDemandZonal', format: 'CSV', frequency: '5-min', path: 'RealtimeDemandZonal' },
-  { name: 'GenOutputCapability', format: 'XML', frequency: '5-min', path: 'GenOutputCapability' },
-  { name: 'GenOutputbyFuelHourly', format: 'XML', frequency: 'Hourly', path: 'GenOutputbyFuelHourly' },
-  { name: 'IntertieScheduleFlow', format: 'XML', frequency: 'Hourly', path: 'IntertieScheduleFlow' },
-  { name: 'DAHourlyOntarioZonalPrice', format: 'XML', frequency: 'Daily', path: 'DAHourlyOntarioZonalPrice' },
-  { name: 'DAHourlyIntertieLMP', format: 'XML', frequency: 'Daily', path: 'DAHourlyIntertieLMP' },
-  { name: 'RealTimeIntertieLMP', format: 'XML', frequency: '5-min', path: 'RealTimeIntertieLMP' },
-  { name: 'Adequacy Report', format: 'XML', frequency: 'Daily', path: 'Adequacy3' },
+  { name: 'RealtimeZonalEnergyPrices', format: 'XML', frequency: '5-min', path: 'RealtimeZonalEnergyPrices', ttl: '90 days' },
+  { name: 'RealtimeDemandZonal', format: 'CSV', frequency: '5-min', path: 'RealtimeDemandZonal', ttl: '90 days' },
+  { name: 'GenOutputCapability', format: 'XML', frequency: '5-min', path: 'GenOutputCapability', ttl: '90 days' },
+  { name: 'GenOutputbyFuelHourly', format: 'XML', frequency: 'Hourly', path: 'GenOutputbyFuelHourly', ttl: '1 year' },
+  { name: 'IntertieScheduleFlow', format: 'XML', frequency: 'Hourly', path: 'IntertieScheduleFlow', ttl: '1 year' },
+  { name: 'DAHourlyOntarioZonalPrice', format: 'XML', frequency: 'Daily', path: 'DAHourlyOntarioZonalPrice', ttl: '90 days' },
+  { name: 'DAHourlyIntertieLMP', format: 'XML', frequency: 'Daily', path: 'DAHourlyIntertieLMP', ttl: '90 days' },
+  { name: 'RealTimeIntertieLMP', format: 'XML', frequency: '5-min', path: 'RealTimeIntertieLMP', ttl: '90 days' },
+  { name: 'Adequacy Report', format: 'XML', frequency: 'Daily', path: 'Adequacy3', ttl: '90 days' },
 ];
 
 export default function AboutPage() {
@@ -76,7 +76,7 @@ export default function AboutPage() {
       <main className={styles.content}>
         <div style={{ width: '100%', maxWidth: '960px', margin: '0 auto 24px', border: '1px solid var(--border-color)', borderRadius: '6px', overflow: 'hidden' }}>
           <Image
-            src="/hero-screenshot.png"
+            src="/hero-screenshot.webp"
             alt="GridGPT Dashboard — real-time Ontario electricity grid monitoring"
             width={960}
             height={540}
@@ -240,13 +240,14 @@ export default function AboutPage() {
                       <span className={styles.archNodeName}>ClickHouse</span>
                       <span className={styles.archNodeDesc}>
                         Columnar <a href="#olap">OLAP</a> database. <a href="#materialized-view">Materialized views</a>{' '}
-                        consume Kafka topics into MergeTree tables. 8{' '}
+                        consume Kafka topics into MergeTree tables. 10{' '}
                         <a href="#dedup-view">dedup views</a> eliminate duplicate rows from
                         producer backfills.
                       </span>
                       <span className={styles.archNodeTech}>
                         v_zonal_prices, v_zonal_demand, v_generator_output, v_fuel_mix,
-                        v_intertie_flow, v_adequacy, v_da_ozp, v_weather
+                        v_intertie_flow, v_adequacy, v_da_ozp, v_weather,
+                        v_realtime_intertie_lmp, v_da_intertie_lmp
                       </span>
                     </div>
                   </div>
@@ -433,7 +434,7 @@ export default function AboutPage() {
             <div className={styles.contextLayer}>
               <span className={styles.contextLayerName}>Schema Definitions</span>
               <span className={styles.contextLayerDesc}>
-                8 table structures with column names, types, and relationships. The LLM knows
+                10 table structures with column names, types, and relationships. The LLM knows
                 exactly what columns exist and how tables relate.
               </span>
             </div>
@@ -447,8 +448,8 @@ export default function AboutPage() {
             <div className={styles.contextLayer}>
               <span className={styles.contextLayerName}>Query Patterns</span>
               <span className={styles.contextLayerDesc}>
-                11 validated SQL templates for common questions: current prices, demand trends,
-                fuel mix breakdowns, intertie flows, and historical comparisons.
+                14 validated SQL templates for common questions: current prices, demand trends,
+                fuel mix breakdowns, intertie flows, intertie LMP, and historical comparisons.
               </span>
             </div>
             <div className={styles.contextLayer}>
@@ -800,6 +801,7 @@ docker exec -it clickhouse clickhouse-client \\
                   <th>Report</th>
                   <th>Format</th>
                   <th>Frequency</th>
+                  <th title="Time To Live &mdash; data older than this is automatically purged from ClickHouse to manage storage">TTL</th>
                   <th>URL</th>
                 </tr>
               </thead>
@@ -809,6 +811,7 @@ docker exec -it clickhouse clickhouse-client \\
                     <td className={styles.mono}>{src.name}</td>
                     <td>{src.format}</td>
                     <td>{src.frequency}</td>
+                    <td title="Time To Live &mdash; data older than this is automatically purged from ClickHouse to manage storage">{src.ttl}</td>
                     <td>
                       <a
                         href={`${IESO_BASE}/${src.path}/`}

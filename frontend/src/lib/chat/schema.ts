@@ -86,6 +86,28 @@ export const IESO_TABLES: TableSchema[] = [
     ],
   },
   {
+    name: 'v_realtime_intertie_lmp',
+    description: 'Deduplicated real-time 5-minute Locational Marginal Prices (LMP) at intertie points with neighbouring jurisdictions',
+    frequency: '5-minute',
+    columns: [
+      { name: 'timestamp', type: 'DateTime', description: 'EST timestamp (naive DateTime, no tz metadata) of the LMP interval' },
+      { name: 'intertie_zone', type: 'String', description: 'Intertie zone group: QUEBEC, NEW-YORK, MICHIGAN, MINNESOTA, MANITOBA' },
+      { name: 'lmp', type: 'Float32', description: 'Locational Marginal Price in $/MWh at the intertie point (averaged across individual interties in zone)' },
+    ],
+  },
+  {
+    name: 'v_da_intertie_lmp',
+    description: 'Deduplicated Day-Ahead hourly Locational Marginal Prices (LMP) at intertie points. Published daily.',
+    frequency: 'Daily',
+    columns: [
+      { name: 'delivery_date', type: 'Date', description: 'Date the prices apply to' },
+      { name: 'delivery_hour', type: 'UInt8', description: 'Hour-ending (1-24) in EST' },
+      { name: 'intertie_zone', type: 'String', description: 'Intertie zone group: QUEBEC, NEW-YORK, MICHIGAN, MINNESOTA, MANITOBA' },
+      { name: 'lmp', type: 'Float32', description: 'Day-ahead Locational Marginal Price in $/MWh (latest published value)' },
+      { name: 'publish_timestamp', type: 'DateTime', description: 'EST timestamp of the latest DA LMP publish for this delivery slot' },
+    ],
+  },
+  {
     name: 'v_weather',
     description: 'Deduplicated weather data from Open-Meteo for Ontario zones. IMPORTANT: Contains both observations AND forecasts (up to 24h ahead). Always filter valid_timestamp <= now() to get current/past observations only.',
     frequency: '15-minute',

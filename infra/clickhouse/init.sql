@@ -286,6 +286,69 @@ CREATE MATERIALIZED VIEW IF NOT EXISTS ieso.weather_mv TO ieso.weather
 AS SELECT * FROM ieso.weather_queue;
 
 -- ============================================================
+-- REALTIME INTERTIE LMP (5-minute data)
+-- ============================================================
+
+-- Kafka consumer table
+CREATE TABLE IF NOT EXISTS ieso.realtime_intertie_lmp_queue (
+    timestamp DateTime,
+    intertie_zone String,
+    lmp Float32
+) ENGINE = Kafka SETTINGS
+    kafka_broker_list = 'redpanda:9092',
+    kafka_topic_list = 'ieso.realtime.intertie-lmp',
+    kafka_group_name = 'clickhouse-realtime-intertie-lmp',
+    kafka_format = 'JSONEachRow',
+    kafka_num_consumers = 1;
+
+-- Storage table
+CREATE TABLE IF NOT EXISTS ieso.realtime_intertie_lmp (
+    timestamp DateTime,
+    intertie_zone String,
+    lmp Float32
+) ENGINE = MergeTree()
+PARTITION BY toYYYYMM(timestamp)
+ORDER BY (intertie_zone, timestamp)
+TTL timestamp + INTERVAL 90 DAY;
+
+-- Auto-insert from Kafka
+CREATE MATERIALIZED VIEW IF NOT EXISTS ieso.realtime_intertie_lmp_mv
+  TO ieso.realtime_intertie_lmp AS
+SELECT * FROM ieso.realtime_intertie_lmp_queue;
+
+-- ============================================================
+-- DAY-AHEAD HOURLY INTERTIE LMP (Daily)
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS ieso.da_intertie_lmp_queue (
+    timestamp DateTime,
+    delivery_date Date,
+    delivery_hour UInt8,
+    intertie_zone String,
+    lmp Float32
+) ENGINE = Kafka SETTINGS
+    kafka_broker_list = 'redpanda:9092',
+    kafka_topic_list = 'ieso.hourly.da-intertie-lmp',
+    kafka_group_name = 'clickhouse-da-intertie-lmp',
+    kafka_format = 'JSONEachRow',
+    kafka_num_consumers = 1;
+
+CREATE TABLE IF NOT EXISTS ieso.da_intertie_lmp (
+    timestamp DateTime,
+    delivery_date Date,
+    delivery_hour UInt8,
+    intertie_zone String,
+    lmp Float32
+) ENGINE = MergeTree()
+PARTITION BY toYYYYMM(timestamp)
+ORDER BY (intertie_zone, delivery_date, delivery_hour)
+TTL timestamp + INTERVAL 90 DAY;
+
+CREATE MATERIALIZED VIEW IF NOT EXISTS ieso.da_intertie_lmp_mv
+  TO ieso.da_intertie_lmp AS
+SELECT * FROM ieso.da_intertie_lmp_queue;
+
+-- ============================================================
 -- DEDUP VIEWS (query these instead of raw tables)
 -- Producer backfills create duplicate rows in MergeTree tables.
 -- These views GROUP BY natural keys to collapse duplicates.
@@ -340,6 +403,19 @@ SELECT delivery_date, delivery_hour, zone,
   max(timestamp) AS publish_timestamp
 FROM ieso.da_ozp
 GROUP BY delivery_date, delivery_hour, zone;
+
+CREATE VIEW IF NOT EXISTS ieso.v_realtime_intertie_lmp AS
+SELECT timestamp, intertie_zone,
+  avg(lmp) AS lmp
+FROM ieso.realtime_intertie_lmp
+GROUP BY timestamp, intertie_zone;
+
+CREATE VIEW IF NOT EXISTS ieso.v_da_intertie_lmp AS
+SELECT delivery_date, delivery_hour, intertie_zone,
+  argMax(lmp, timestamp) AS lmp,
+  max(timestamp) AS publish_timestamp
+FROM ieso.da_intertie_lmp
+GROUP BY delivery_date, delivery_hour, intertie_zone;
 
 CREATE VIEW IF NOT EXISTS ieso.v_weather AS
 SELECT valid_timestamp, zone,
