@@ -744,8 +744,8 @@ function MapContent({
     const fetchFlowData = async () => {
       const flowByGroup: Record<string, { mw: number; lastUpdated: string }> =
         {};
-      let daPrices: Record<string, number> = {};
-      let rtPrices: Record<string, number> = {};
+      const daPrices: Record<string, number> = {};
+      const rtPrices: Record<string, number> = {};
 
       try {
         if (isFuture) {
