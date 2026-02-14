@@ -172,7 +172,7 @@ function MapContent({
   >(new Map());
   const lastIntertieHourRef = useRef<string | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const polylineRefsRef = useRef<Map<string, any>>(new Map());
+  const polylineRefsRef = useRef<Map<string, { visible: any; hit: any }>>(new Map());
   const tempLayerRef = useRef<L.GeoJSON | null>(null);
   const cloudLayerRef = useRef<L.GeoJSON | null>(null);
   // WMS preload cache: all GDPS time steps × 3 layer types, keyed by ISO time string
@@ -495,12 +495,27 @@ function MapContent({
       layers.push(imageOverlay);
 
       // Add 8 intertie polylines with default "no data" styling
+      // Each intertie gets TWO polylines:
+      //   visible: thin styled line (non-interactive)
+      //   hit:     wide invisible line for hover detection + tooltip
       INTERTIES.forEach((intertie) => {
-        const polyline = L.polyline(intertie.path, {
+        const initialStyle = {
           color: "#F0883E",
           weight: 4,
           opacity: 0.5,
           dashArray: "8, 6",
+        };
+        const visible = L.polyline(intertie.path, {
+          ...initialStyle,
+          interactive: false,
+        });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (visible as any)._currentStyle = initialStyle;
+
+        const hit = L.polyline(intertie.path, {
+          weight: 24,
+          opacity: 0,
+          color: "#000",
         }).bindTooltip(
           `<div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 8px; background: #161B22; border: 1px solid #30363D;">
             <div style="font-weight: 600; color: #E6EDF3; margin-bottom: 4px;">${intertie.name}</div>
@@ -508,10 +523,25 @@ function MapContent({
           </div>`,
           { direction: "auto", className: "zone-tooltip", sticky: true },
         );
-        layers.push(polyline);
+
+        // Visual hover feedback on the visible line
+        hit.on("mouseover", () => {
+          visible.setStyle({ opacity: 0.9, weight: 5 });
+        });
+        hit.on("mouseout", () => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const current = (visible as any)._currentStyle;
+          visible.setStyle({
+            opacity: current?.opacity ?? 0.5,
+            weight: current?.weight ?? 4,
+          });
+        });
+
+        layers.push(visible);
+        layers.push(hit);
         polylineRefsRef.current.set(
           intertie.flowKey + ":" + intertie.name,
-          polyline,
+          { visible, hit },
         );
       });
 
@@ -631,10 +661,11 @@ function MapContent({
       const prices = isFuture ? daPrices : (Object.keys(rtPrices).length > 0 ? rtPrices : intertiePriceRef.current);
 
       INTERTIES.forEach((intertie) => {
-        const polyline = polylineRefsRef.current.get(
+        const ref = polylineRefsRef.current.get(
           intertie.flowKey + ":" + intertie.name,
         );
-        if (!polyline) return;
+        if (!ref) return;
+        const { visible, hit } = ref;
 
         // Future time: white dashed lines with DA LMP tooltip only
         if (isFuture) {
@@ -643,14 +674,17 @@ function MapContent({
             ? `<div style="color: #D29922; font-weight: 600; margin-top: 2px;">Forecasted Price: $${daLmp.toFixed(2)}</div>`
             : `<div style="color: #8B949E; margin-top: 2px;">Forecasted Price: N/A</div>`;
 
-          polyline.setStyle({
+          const style = {
             color: '#FFFFFF',
             opacity: 0.6,
             dashArray: '6, 6',
             weight: 4,
-          });
+          };
+          visible.setStyle(style);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (visible as any)._currentStyle = style;
 
-          polyline.setTooltipContent(
+          hit.setTooltipContent(
             `<div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 8px; background: #161B22; border: 1px solid #30363D;">
               <div style="font-weight: 600; color: #E6EDF3; margin-bottom: 4px;">${intertie.name}</div>
               <div style="color: #8B949E; font-weight: 600;">FORECAST</div>
@@ -699,14 +733,17 @@ function MapContent({
           ? `<div style="color: #D29922; font-weight: 600; margin-top: 2px;">${isAggregate ? "Avg " : ""}Price: $${lmp.toFixed(2)}${isAggregate ? ` (${iesoCount} interties)` : ""}</div>`
           : "";
 
-        polyline.setStyle({
+        const style = {
           color: lineColor,
-          opacity: hasFlow ? 0.3 : 0.5,
+          opacity: hasFlow ? 0.5 : 0.5,
           dashArray: hasFlow ? "6, 8" : "8, 6",
-          weight: hasFlow ? 2 : 4,
-        });
+          weight: hasFlow ? 3 : 4,
+        };
+        visible.setStyle(style);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (visible as any)._currentStyle = style;
 
-        polyline.setTooltipContent(
+        hit.setTooltipContent(
           `<div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 8px; background: #161B22; border: 1px solid #30363D;">
             <div style="font-weight: 600; color: #E6EDF3; margin-bottom: 4px;">${intertie.name}</div>
             <div style="color: ${dirColor}; font-weight: 600;">${dirLabel} ${hasFlow ? (isAggregate ? "Total " : "") + Math.abs(mw).toFixed(0) + " MW" : ""}</div>
