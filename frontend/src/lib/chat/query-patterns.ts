@@ -189,7 +189,50 @@ GROUP BY intertie
 ORDER BY intertie
 LIMIT 20
 
-### 14. Current Weather Across Ontario Zones (NOTE: v_weather uses UTC timestamps — subtract 5h for EST display)
+### 14. Current Intertie LMP by Zone (real-time, EST timestamps)
+SELECT
+  intertie_zone,
+  round(argMax(lmp, timestamp), 2) AS lmp,
+  max(timestamp) AS latest_timestamp
+FROM ieso.v_realtime_intertie_lmp
+WHERE timestamp > subtractHours(now(), 5) - INTERVAL 1 HOUR
+GROUP BY intertie_zone
+ORDER BY intertie_zone
+LIMIT 20
+
+### 15. Intertie LMP Comparison: Real-Time vs Day-Ahead
+SELECT
+  rt.intertie_zone,
+  round(rt.rt_lmp, 2) AS rt_lmp,
+  round(da.da_lmp, 2) AS da_lmp,
+  round(rt.rt_lmp - da.da_lmp, 2) AS spread
+FROM (
+  SELECT intertie_zone, argMax(lmp, timestamp) AS rt_lmp
+  FROM ieso.v_realtime_intertie_lmp
+  WHERE timestamp > subtractHours(now(), 5) - INTERVAL 1 HOUR
+  GROUP BY intertie_zone
+) rt
+LEFT JOIN (
+  SELECT intertie_zone, lmp AS da_lmp
+  FROM ieso.v_da_intertie_lmp
+  WHERE delivery_date = toDate(subtractHours(now(), 5))
+    AND delivery_hour = toHour(subtractHours(now(), 5)) + 1
+) da ON rt.intertie_zone = da.intertie_zone
+ORDER BY rt.intertie_zone
+LIMIT 20
+
+### 16. 24-Hour Intertie LMP Trend (hourly average by zone, EST timestamps)
+SELECT
+  toStartOfHour(timestamp) AS hour,
+  intertie_zone,
+  round(avg(lmp), 2) AS avg_lmp
+FROM ieso.v_realtime_intertie_lmp
+WHERE timestamp > subtractHours(now(), 5) - INTERVAL 24 HOUR
+GROUP BY hour, intertie_zone
+ORDER BY hour, intertie_zone
+LIMIT 500
+
+### 17. Current Weather Across Ontario Zones (NOTE: v_weather uses UTC timestamps — subtract 5h for EST display)
 SELECT
   subtractHours(valid_timestamp, 5) AS est_time,
   zone,

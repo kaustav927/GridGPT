@@ -42,11 +42,13 @@ Python Producer (aiohttp + confluent-kafka + Pydantic)
 │  Redpanda (Kafka-compatible streaming)      │
 │      │  Kafka Engine materialized views     │
 │      ▼                                      │
-│  ClickHouse (8 dedup views)                 │
+│  ClickHouse (10 dedup views)                │
 │      v_zonal_prices, v_zonal_demand,        │
 │      v_generator_output, v_fuel_mix,        │
 │      v_intertie_flow, v_adequacy,           │
-│      v_da_ozp, v_weather                    │
+│      v_da_ozp, v_weather,                   │
+│      v_realtime_intertie_lmp,               │
+│      v_da_intertie_lmp                      │
 │                                             │
 │  Redis (cache) + init-kafka (provisioning)  │
 └─────────────────────────────────────────────┘
@@ -110,9 +112,9 @@ Grid AI is a [context-grounded](#context-grounded) query assistant that translat
 
 | Layer | Description |
 |-------|-------------|
-| **Schema Definitions** | 8 table structures with column names, types, and relationships. The LLM knows exactly what columns exist and how tables relate. |
+| **Schema Definitions** | 10 table structures with column names, types, and relationships. The LLM knows exactly what columns exist and how tables relate. |
 | **Domain Knowledge** | IESO market rules, timezone handling (EST storage vs UTC queries), zone mappings, fuel type categories, and pricing model details. |
-| **Query Patterns** | 11 validated SQL templates for common questions: current prices, demand trends, fuel mix breakdowns, intertie flows, and historical comparisons. |
+| **Query Patterns** | 14 validated SQL templates for common questions: current prices, demand trends, fuel mix breakdowns, intertie flows, intertie LMP, and historical comparisons. |
 | **Temporal Context** | EST timestamp storage rules, UTC conversion formulas, delivery hour calculations, and common pitfalls around timezone boundaries. |
 
 ### Tool Loop
@@ -284,17 +286,19 @@ docker exec -it clickhouse clickhouse-client \
 
 All data comes from [IESO](#ieso)'s public report server at `https://reports-public.ieso.ca/public/`. These reports are freely available and require no authentication.
 
-| Report | Format | Frequency | Link |
-|--------|--------|-----------|------|
-| RealtimeZonalEnergyPrices | XML | 5-min | [Link](https://reports-public.ieso.ca/public/RealtimeZonalEnergyPrices/) |
-| RealtimeDemandZonal | CSV | 5-min | [Link](https://reports-public.ieso.ca/public/RealtimeDemandZonal/) |
-| GenOutputCapability | XML | 5-min | [Link](https://reports-public.ieso.ca/public/GenOutputCapability/) |
-| GenOutputbyFuelHourly | XML | Hourly | [Link](https://reports-public.ieso.ca/public/GenOutputbyFuelHourly/) |
-| IntertieScheduleFlow | XML | Hourly | [Link](https://reports-public.ieso.ca/public/IntertieScheduleFlow/) |
-| DayAheadOntarioZonalPrice | XML | Daily | [Link](https://reports-public.ieso.ca/public/DayAheadOntarioZonalPrice/) |
-| DayAheadIntertieLMP | XML | Daily | [Link](https://reports-public.ieso.ca/public/DayAheadIntertieLMP/) |
-| RealtimeIntertieLMP | XML | 5-min | [Link](https://reports-public.ieso.ca/public/RealtimeIntertieLMP/) |
-| Adequacy2 | XML | Daily | [Link](https://reports-public.ieso.ca/public/Adequacy2/) |
+| Report | Format | Frequency | TTL | Link |
+|--------|--------|-----------|-----|------|
+| RealtimeZonalEnergyPrices | XML | 5-min | 90 days | [Link](https://reports-public.ieso.ca/public/RealtimeZonalEnergyPrices/) |
+| RealtimeDemandZonal | CSV | 5-min | 90 days | [Link](https://reports-public.ieso.ca/public/RealtimeDemandZonal/) |
+| GenOutputCapability | XML | 5-min | 90 days | [Link](https://reports-public.ieso.ca/public/GenOutputCapability/) |
+| GenOutputbyFuelHourly | XML | Hourly | 1 year | [Link](https://reports-public.ieso.ca/public/GenOutputbyFuelHourly/) |
+| IntertieScheduleFlow | XML | Hourly | 1 year | [Link](https://reports-public.ieso.ca/public/IntertieScheduleFlow/) |
+| DayAheadOntarioZonalPrice | XML | Daily | 90 days | [Link](https://reports-public.ieso.ca/public/DayAheadOntarioZonalPrice/) |
+| DayAheadIntertieLMP | XML | Daily | 90 days | [Link](https://reports-public.ieso.ca/public/DayAheadIntertieLMP/) |
+| RealtimeIntertieLMP | XML | 5-min | 90 days | [Link](https://reports-public.ieso.ca/public/RealtimeIntertieLMP/) |
+| Adequacy2 | XML | Daily | 90 days | [Link](https://reports-public.ieso.ca/public/Adequacy2/) |
+
+> **TTL** (Time To Live) — data older than the TTL period is automatically purged from ClickHouse to manage storage.
 
 ---
 

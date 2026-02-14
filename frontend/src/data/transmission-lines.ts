@@ -15,12 +15,12 @@ export interface Intertie {
 
 // Inter-provincial/international transmission interties from IESO data
 export const INTERTIES: Intertie[] = [
-  { name: 'Quebec North', path: [[46.50, -79.32], [46.76, -78.70]], flowKey: 'QUEBEC' },
-  { name: 'Quebec South (Ottawa) 1', path: [[45.43, -76.75], [45.71, -76.33]], flowKey: 'QUEBEC' },
-  { name: 'Quebec South (Ottawa) 2', path: [[45.23, -75.83], [45.62, -75.75]], flowKey: 'QUEBEC' },
-  { name: 'New York St. Lawrence', path: [[45.13, -74.97], [44.81, -74.61]], flowKey: 'NEW-YORK' },
-  { name: 'New York Niagara', path: [[43.03, -79.32], [43.05, -78.63]], flowKey: 'NEW-YORK' },
-  { name: 'Minnesota', path: [[48.60, -92.25], [48.25, -92.84]], flowKey: 'MINNESOTA' },
-  { name: 'Manitoba', path: [[49.96, -94.29], [50.00, -95.96]], flowKey: 'MANITOBA' },
-  { name: 'Michigan', path: [[42.39, -82.22], [42.35, -83.15]], flowKey: 'MICHIGAN' },
+  { name: 'Quebec North', path: [[46.37, -79.63], [46.89, -78.39]], flowKey: 'QUEBEC' },
+  { name: 'Quebec South (Ottawa) 1', path: [[45.29, -76.96], [45.85, -76.12]], flowKey: 'QUEBEC' },
+  { name: 'Quebec South (Ottawa) 2', path: [[45.04, -75.87], [45.82, -75.71]], flowKey: 'QUEBEC' },
+  { name: 'New York St. Lawrence', path: [[45.29, -75.15], [44.65, -74.43]], flowKey: 'NEW-YORK' },
+  { name: 'New York Niagara', path: [[43.02, -79.67], [43.06, -78.29]], flowKey: 'NEW-YORK' },
+  { name: 'Minnesota', path: [[48.78, -91.95], [48.08, -93.14]], flowKey: 'MINNESOTA' },
+  { name: 'Manitoba', path: [[49.94, -93.46], [50.02, -96.80]], flowKey: 'MANITOBA' },
+  { name: 'Michigan', path: [[42.41, -81.76], [42.33, -83.62]], flowKey: 'MICHIGAN' },
 ];

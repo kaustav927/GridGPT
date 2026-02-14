@@ -15,6 +15,12 @@ interface IntertiePriceRow {
   timestamp: string;
 }
 
+// Zones with multiple IESO intertie points (prices are averaged)
+const AGGREGATE_ZONES: Record<string, number> = {
+  'QUEBEC': 9,
+  'NEW-YORK': 2,
+};
+
 // Display order and label mapping
 const DISPLAY_ORDER: { key: string; label: string }[] = [
   { key: 'MICHIGAN', label: 'Michigan' },
@@ -71,6 +77,22 @@ export default function Interties() {
 
   const hasNetFlow = Math.abs(netFlow) > 1;
 
+  // Calculate flow-weighted average LMP across all interties
+  const avgPrice = useMemo(() => {
+    let weightedSum = 0;
+    let totalWeight = 0;
+    for (const { key } of DISPLAY_ORDER) {
+      const entry = flowData[key];
+      const lmp = priceData[key];
+      if (entry && lmp !== undefined && Math.abs(entry.mw) > 1) {
+        const weight = Math.abs(entry.mw);
+        weightedSum += weight * lmp;
+        totalWeight += weight;
+      }
+    }
+    return totalWeight === 0 ? null : weightedSum / totalWeight;
+  }, [flowData, priceData]);
+
   // Compute most recent timestamp across all interties
   const latestUpdate = useMemo(() => {
     const timestamps = Object.values(flowData)
@@ -110,19 +132,20 @@ export default function Interties() {
               key={key}
               title={asOfLabel}
               style={{
-                display: 'flex',
-                justifyContent: 'space-between',
+                display: 'grid',
+                gridTemplateColumns: '1fr 120px 70px',
                 alignItems: 'center',
+                gap: '8px',
                 fontSize: '11px',
               }}
             >
               <span>{label}</span>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'flex-end' }}>
                 {hasFlow && isExport && (
-                  <span style={{ color: '#3FB950', fontSize: '14px', fontWeight: 700, lineHeight: 1 }}>›</span>
+                  <span style={{ color: '#3FB950', fontSize: '11px', fontWeight: 700, lineHeight: 1 }}>›››</span>
                 )}
                 {hasFlow && isImport && (
-                  <span style={{ color: '#F85149', fontSize: '14px', fontWeight: 700, lineHeight: 1 }}>‹</span>
+                  <span style={{ color: '#F85149', fontSize: '11px', fontWeight: 700, lineHeight: 1 }}>‹‹‹</span>
                 )}
                 <span
                   style={{
@@ -133,34 +156,62 @@ export default function Interties() {
                 >
                   {hasFlow ? (isExport ? '+' : '') : ''}{Math.round(mw)} MW
                 </span>
-                {lmp !== undefined && (
-                  <span style={{ color: '#8B949E', fontSize: '10px', fontVariantNumeric: 'tabular-nums' }}>
-                    @ ${lmp.toFixed(2)}
-                  </span>
-                )}
               </div>
+              <span
+                style={{
+                  color: lmp !== undefined ? '#D29922' : '#8B949E',
+                  fontVariantNumeric: 'tabular-nums',
+                  fontWeight: 600,
+                  fontSize: '10px',
+                  textAlign: 'right',
+                  minWidth: '52px',
+                }}
+              >
+                {lmp !== undefined ? `${AGGREGATE_ZONES[key] ? 'Avg ' : ''}$${lmp.toFixed(2)}` : '---'}
+              </span>
             </div>
           );
         })}
       </div>
 
-      {/* Summary row: Net Flow */}
+      {/* Summary row: Net Flow + Avg Price */}
       <div style={{
         borderTop: '1px solid #30363D',
         marginTop: '12px',
         paddingTop: '12px',
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr',
+        gap: '8px',
       }}>
-        <div style={{ fontSize: '10px', color: '#8B949E', marginBottom: '4px' }}>
-          NET FLOW
+        <div>
+          <div style={{ fontSize: '10px', color: '#8B949E', marginBottom: '4px' }}>
+            NET FLOW
+          </div>
+          <div style={{
+            fontSize: '22px',
+            fontWeight: 600,
+            fontVariantNumeric: 'tabular-nums',
+            color: !hasNetFlow ? '#8B949E' : netFlow >= 0 ? '#3FB950' : '#F85149',
+          }}>
+            {hasNetFlow ? (netFlow >= 0 ? '+' : '') : ''}{Math.round(netFlow)} MW
+          </div>
         </div>
-        <div style={{
-          fontSize: '22px',
-          fontWeight: 600,
-          fontVariantNumeric: 'tabular-nums',
-          color: !hasNetFlow ? '#8B949E' : netFlow >= 0 ? '#3FB950' : '#F85149',
-        }}>
-          {hasNetFlow ? (netFlow >= 0 ? '+' : '') : ''}{Math.round(netFlow)} MW
-        </div>
+        {avgPrice !== null && (
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: '10px', color: '#8B949E', marginBottom: '4px' }}>
+              AVG PRICE
+            </div>
+            <div style={{
+              fontSize: '22px',
+              fontWeight: 600,
+              fontVariantNumeric: 'tabular-nums',
+              color: '#D29922',
+              textAlign: 'right',
+            }}>
+              ${avgPrice.toFixed(2)}
+            </div>
+          </div>
+        )}
       </div>
     </>
   );

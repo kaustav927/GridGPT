@@ -36,6 +36,15 @@ export const DOMAIN_KNOWLEDGE = `
 - MANITOBA and MANITOBA SK should be grouped as MANITOBA
 - Other interties: MICHIGAN, MINNESOTA, NEW-YORK (each standalone)
 
+### Intertie LMP (Locational Marginal Prices)
+- LMP at interties reflects the cost of delivering power at the boundary point between Ontario and a neighbouring jurisdiction.
+- Intertie LMP differs from Ontario zonal prices — it includes transmission congestion and losses at the specific border point, not within Ontario's internal zones.
+- v_realtime_intertie_lmp stores 5-minute real-time LMP per intertie zone (QUEBEC, NEW-YORK, MICHIGAN, MINNESOTA, MANITOBA). These are averaged across individual IESO intertie points within each zone.
+- v_da_intertie_lmp stores day-ahead hourly LMP per intertie zone, published daily. Uses delivery_date + delivery_hour like v_da_ozp.
+- Both tables store timestamps in EST (same as most other tables). Use subtractHours(now(), 5) for time-range filters.
+- QUEBEC has 9 individual IESO intertie points, NEW-YORK has 2, MANITOBA has 2, MICHIGAN and MINNESOTA each have 1.
+- When comparing intertie LMP across zones, note that zones with more interties (QUEBEC) have more averaged values.
+
 ### Deduplication
 - Raw tables may contain duplicate rows from producer backfills.
 - Always query the deduplicated views (v_zonal_prices, v_zonal_demand, etc.) — these are the table names in the schema above.
@@ -52,8 +61,17 @@ For multi-day queries (week-over-week, trends), link to the most recent day's re
 - Intertie Flow (daily): https://reports-public.ieso.ca/public/IntertieScheduleFlow/PUB_IntertieScheduleFlow_YYYYMMDD.xml
 - Adequacy Forecast (daily): https://reports-public.ieso.ca/public/Adequacy3/PUB_Adequacy3_YYYYMMDD.xml
 - Day-Ahead Zonal Prices (daily): https://reports-public.ieso.ca/public/DAHourlyZonal/PUB_DAHourlyZonal_YYYYMMDD.xml
+- Day-Ahead Ontario Price (daily): https://reports-public.ieso.ca/public/DAHourlyOntarioZonalPrice/PUB_DAHourlyOntarioZonalPrice_YYYYMMDD.xml
 - Realtime Demand (daily CSV): https://reports-public.ieso.ca/public/RealtimeDemandZonal/PUB_RealtimeDemandZonal_YYYYMMDD.csv
 Example: For Feb 06, 2026 Hour 15 prices → https://reports-public.ieso.ca/public/RealtimeZonalEnergyPrices/PUB_RealtimeZonalEnergyPrices_2026020615.xml
+
+CRITICAL: The YYYYMMDD in DA report URLs is the PUBLICATION date (when the report was released), NOT the delivery_date.
+- DA reports are published daily ~1:30 PM EST. The report published on Feb 12 contains delivery_date = Feb 13.
+- To link to "today's settlement prices" (delivery_date = today), use YYYYMMDD = yesterday's date in the URL.
+- To link to "tomorrow's DA forecast" (delivery_date = tomorrow), use YYYYMMDD = today's date in the URL.
+- Example: For delivery_date 2026-02-13, the report was published on 2026-02-12, so URL uses 20260212.
+- For Adequacy3, the date logic is the same: publication date, not delivery date.
+- For RT Zonal Prices, Fuel Mix, Intertie Flow, and other non-DA reports, YYYYMMDD matches the actual data date (no offset).
 
 ### Ontario Electricity Pricing (Single Schedule Market, effective May 2025)
 - Ontario replaced the legacy HOEP with the Ontario Energy Market Price (OEMP).

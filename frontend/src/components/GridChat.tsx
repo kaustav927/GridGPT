@@ -437,7 +437,9 @@ export default function GridChat() {
     localStorage.removeItem(STORAGE_KEY);
   }, []);
 
-  const showSuggestions = messages.length === 0 || (!loading && messages.length > 0 && messages[messages.length - 1]?.role === 'assistant');
+  const [suggestionsVisible, setSuggestionsVisible] = useState(true);
+
+  const showSuggestions = suggestionsVisible && (messages.length === 0 || (!loading && messages.length > 0 && messages[messages.length - 1]?.role === 'assistant'));
 
   const renderMessages = () => (
     <div className={styles.messageList} ref={messageListRef}>
@@ -481,7 +483,15 @@ export default function GridChat() {
   const renderSuggestions = () =>
     showSuggestions ? (
       <div className={styles.suggestions}>
-        <div className={styles.suggestionsLabel}>SUGGESTED</div>
+        <div className={styles.suggestionsHeader}>
+          <div className={styles.suggestionsLabel}>SUGGESTED</div>
+          <button
+            className={styles.suggestionsClose}
+            onClick={() => setSuggestionsVisible(false)}
+          >
+            &#10005;
+          </button>
+        </div>
         {suggestions.map((q, i) => (
           <div key={i} className={styles.questionChip} onClick={() => handleSuggestionClick(q)}>
             <span className={styles.chipText}>{q}</span>
@@ -509,8 +519,8 @@ export default function GridChat() {
       )}
     <div className={styles.inputArea}>
       {messages.length > 0 && (
-        <button className={styles.clearBtn} onClick={handleClear}>
-          CLEAR
+        <button className={styles.clearBtn} onClick={handleClear} title="Clear chat">
+          &#128465;
         </button>
       )}
       <textarea
