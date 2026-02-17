@@ -95,7 +95,7 @@ A dual-axis Recharts chart with demand, supply, and grid load on the left [MW](#
 ### Grid AI
 **Data source:** All ClickHouse tables via `/api/chat`
 
-A [text-to-SQL](#text-to-sql) chatbot powered by the Claude API. Users ask natural language questions like "What was the average price in Toronto this morning?" and the system generates validated SQL, executes it against ClickHouse, and streams back the answer with a strategy explanation. Chat history persists in localStorage.
+A [text-to-SQL](#text-to-sql) chatbot powered by the Claude API. Users ask natural language questions like "What was the average price in Toronto this morning?" and the system generates validated SQL, executes it against ClickHouse, and streams back the answer with a strategy explanation. Responses include IESO source attribution with direct links to the public reports used. Chat history persists in localStorage.
 
 ### Interties
 **Data source:** `v_intertie_flow`
@@ -119,25 +119,28 @@ Grid AI is a [context-grounded](#context-grounded) query assistant that translat
 
 ### Tool Loop
 
-The chat API uses Claude's tool-use capability with a `query_clickhouse` tool. On each turn, the model generates SQL plus a plain-English strategy explanation. The SQL passes through a safety validator (SELECT-only, LIMIT required, no `system.*` tables) before executing against ClickHouse. If the query returns an error or empty results, the model can retry with corrected SQL for up to 3 iterations.
+The chat API uses Claude's tool-use capability with two tools: `query_clickhouse` for SQL execution and `cite_sources` for source attribution. On each turn, the model generates SQL plus a plain-English strategy explanation. The SQL passes through a safety validator (SELECT-only, LIMIT required, no `system.*` tables) before executing against ClickHouse. If the query returns an error or empty results, the model can retry with corrected SQL for up to 3 iterations. After answering, the model calls `cite_sources` to report the IESO data sources used, with direct links to the public reports.
 
 ### SSE Streaming
 
-Results stream to the browser via [Server-Sent Events](#sse) with true token-level streaming from the Claude API. The frontend receives four event types:
+Results stream to the browser via [Server-Sent Events](#sse) with true token-level streaming from the Claude API. The frontend receives seven event types:
 
+- `quota` — remaining daily questions for the user
 - `tool_use` — SQL query and strategy explanation
 - `tool_result` — row count and execution duration
 - `text_delta` — real-time token-level streaming from the Claude API
+- `sources_loading` — source citation in progress
+- `sources` — IESO report URLs used to answer the question
 - `done` — stream completion signal
 
-The Grid AI component renders tool badges, strategy text, markdown-formatted answers, and persists conversations in localStorage.
+The Grid AI component renders tool badges, strategy text, markdown-formatted answers, source citations with report links, and persists conversations in localStorage.
 
 ```
 User Question (natural language)
     ▼
 Context Assembly (schema + domain + patterns + temporal rules)
     ▼
-Claude API Streaming (claude-sonnet-4, query_clickhouse tool)
+Claude API Streaming (claude-sonnet-4, query_clickhouse + cite_sources tools)
     ▼
 Tool Loop (up to 3 iterations):
     ├─ Generate SQL + strategy
@@ -146,9 +149,12 @@ Tool Loop (up to 3 iterations):
     └─ Check results → retry if error/empty
     ▼
 SSE Stream → GridChat Component
+    ├─ quota (remaining daily questions)
     ├─ tool_use (SQL + strategy)
     ├─ tool_result (row count + duration)
     ├─ text_delta (token-level streaming)
+    ├─ sources_loading (citation in progress)
+    ├─ sources (IESO report URLs)
     └─ done
 ```
 
@@ -299,6 +305,18 @@ All data comes from [IESO](#ieso)'s public report server at `https://reports-pub
 | Adequacy2 | XML | Daily | 90 days | [Link](https://reports-public.ieso.ca/public/Adequacy2/) |
 
 > **TTL** (Time To Live) — data older than the TTL period is automatically purged from ClickHouse to manage storage.
+
+---
+
+## Data Retention
+
+ClickHouse tables use TTL policies to automatically purge old data and keep storage bounded. The retention tiers are:
+
+- **90 days** — 5-minute real-time data (zonal prices, demand, generator output, intertie LMP, adequacy, day-ahead prices)
+- **1 year** — Hourly aggregates (fuel mix, intertie schedule flows)
+- **7 days** — Weather forecasts (ECCC GDPS data)
+
+Grid AI enforces a rate limit of **5 questions per day** per anonymous user, tracked by IP address with a 7-day TTL on the tracking key in Redis.
 
 ---
 

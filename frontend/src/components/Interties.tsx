@@ -1,6 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import Tooltip from './Tooltip';
+import styles from './Interties.module.css';
 
 
 interface IntertieRow {
@@ -103,7 +105,7 @@ export default function Interties() {
   }, [flowData]);
 
   return (
-    <>
+    <div className={styles.wrapper}>
       {latestUpdate && (
         <div style={{ fontSize: '9px', color: '#8B949E', marginBottom: '8px', fontVariantNumeric: 'tabular-nums' }}>
           As of {new Date(latestUpdate.replace(' ', 'T') + 'Z').toLocaleString('en-GB', {
@@ -113,7 +115,15 @@ export default function Interties() {
           })} EST
         </div>
       )}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+
+      {/* Column header */}
+      <div className={styles.columnHeader}>
+        <span>Intertie</span>
+        <span style={{ textAlign: 'right' }}>Flow (MW)</span>
+        <span style={{ textAlign: 'right' }}>Price ($/MWh)</span>
+      </div>
+
+      <div>
         {DISPLAY_ORDER.map(({ key, label }) => {
           // API convention: positive = export from Ontario, negative = import to Ontario
           const entry = flowData[key];
@@ -122,22 +132,12 @@ export default function Interties() {
           const isExport = mw > 0;
           const isImport = mw < 0;
           const hasFlow = Math.abs(mw) > 1;
-
-          const asOfLabel = entry?.lastUpdated
-            ? `as of ${new Date(entry.lastUpdated.replace(' ', 'T') + 'Z').toLocaleString(undefined, { timeZone: 'America/Toronto', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`
-            : '';
+          const isAggregate = !!AGGREGATE_ZONES[key];
 
           return (
             <div
               key={key}
-              title={asOfLabel}
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 120px 70px',
-                alignItems: 'center',
-                gap: '8px',
-                fontSize: '11px',
-              }}
+              className={styles.row}
             >
               <span>{label}</span>
               <div style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'flex-end' }}>
@@ -167,7 +167,16 @@ export default function Interties() {
                   minWidth: '52px',
                 }}
               >
-                {lmp !== undefined ? `${AGGREGATE_ZONES[key] ? 'Avg ' : ''}$${lmp.toFixed(2)}` : '---'}
+                {lmp !== undefined ? (
+                  <>
+                    ${lmp.toFixed(2)}
+                    {isAggregate && (
+                      <Tooltip content={<span style={{ whiteSpace: 'nowrap' }}>{`Average across ${AGGREGATE_ZONES[key]} intertie connections`}</span>}>
+                        <span className={styles.avgLabel}> Avg</span>
+                      </Tooltip>
+                    )}
+                  </>
+                ) : '---'}
               </span>
             </div>
           );
@@ -175,19 +184,12 @@ export default function Interties() {
       </div>
 
       {/* Summary row: Net Flow + Avg Price */}
-      <div style={{
-        borderTop: '1px solid #30363D',
-        marginTop: '12px',
-        paddingTop: '12px',
-        display: 'grid',
-        gridTemplateColumns: '1fr 1fr',
-        gap: '8px',
-      }}>
+      <div className={styles.footer}>
         <div>
           <div style={{ fontSize: '10px', color: '#8B949E', marginBottom: '4px' }}>
             NET FLOW
           </div>
-          <div style={{
+          <div className={styles.footerValue} style={{
             fontSize: '22px',
             fontWeight: 600,
             fontVariantNumeric: 'tabular-nums',
@@ -199,9 +201,9 @@ export default function Interties() {
         {avgPrice !== null && (
           <div style={{ textAlign: 'right' }}>
             <div style={{ fontSize: '10px', color: '#8B949E', marginBottom: '4px' }}>
-              AVG PRICE
+              AVG PRICE ($/MWh)
             </div>
-            <div style={{
+            <div className={styles.footerValue} style={{
               fontSize: '22px',
               fontWeight: 600,
               fontVariantNumeric: 'tabular-nums',
@@ -213,6 +215,6 @@ export default function Interties() {
           </div>
         )}
       </div>
-    </>
+    </div>
   );
 }

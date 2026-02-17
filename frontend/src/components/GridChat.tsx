@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback, memo } from 'react';
-import type { ChatMessage, ToolCallMeta, SSEEvent, PendingToolCall } from '@/lib/chat/types';
+import type { ChatMessage, ToolCallMeta, SSEEvent, PendingToolCall, SourceCitation } from '@/lib/chat/types';
 import { getSuggestedQuestions, getRandomSuggestedQuestions } from '@/lib/chat/suggested-questions';
 import styles from './GridChat.module.css';
 
@@ -17,6 +17,12 @@ function escapeHtml(str: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+function stripSourceLines(text: string): string {
+  // Strip "Sources:" section and everything after it (sources always come last)
+  // Handles: **Sources:** (bold), *Source:* (italic), Sources: (plain), etc.
+  return text.replace(/\n*\*{0,2}Sources?:?\*{0,2}\s*\n[\s\S]*$/gim, '').trim();
 }
 
 function renderMarkdown(text: string): string {
@@ -150,6 +156,27 @@ function PendingToolBadge({ pending }: { pending: PendingToolCall }) {
   );
 }
 
+function SourcesPanel({ sources }: { sources: SourceCitation[] }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className={styles.sourcesPanel}>
+      <div className={styles.sourcesToggle} onClick={() => setOpen(!open)}>
+        <span className={open ? styles.toolBadgeIconOpen : styles.toolBadgeIcon}>&#9654;</span>
+        {sources.length} source{sources.length !== 1 ? 's' : ''}
+      </div>
+      {open && (
+        <div className={styles.sourcesList}>
+          {sources.map((s, i) => (
+            <a key={i} href={s.url} target="_blank" rel="noopener noreferrer" className={styles.sourceLink}>
+              {s.name}
+            </a>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Memoized message bubble — prevents DOM replacement during streaming,
 // which preserves text selection for copy/paste
 const MessageBubble = memo(function MessageBubble({ msg }: { msg: ChatMessage }) {
@@ -164,8 +191,9 @@ const MessageBubble = memo(function MessageBubble({ msg }: { msg: ChatMessage })
       )}
       <div
         className={styles.messageContent}
-        dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
+        dangerouslySetInnerHTML={{ __html: renderMarkdown(stripSourceLines(msg.content)) }}
       />
+      {msg.sources && msg.sources.length > 0 && <SourcesPanel sources={msg.sources} />}
       {msg.role === 'assistant' && (
         <div className={styles.disclaimer}>
           AI-generated responses may be inaccurate. Please verify important information.
@@ -182,6 +210,8 @@ export default function GridChat() {
   const [streamingContent, setStreamingContent] = useState('');
   const [streamingTools, setStreamingTools] = useState<ToolCallMeta[]>([]);
   const [pendingTool, setPendingTool] = useState<PendingToolCall | null>(null);
+  const [streamingSources, setStreamingSources] = useState<SourceCitation[]>([]);
+  const [sourcesLoading, setSourcesLoading] = useState(false);
   const [remaining, setRemaining] = useState<number | null>(null);
   const [suggestions, setSuggestions] = useState(() => getSuggestedQuestions());
   const messageListRef = useRef<HTMLDivElement>(null);
@@ -247,7 +277,7 @@ export default function GridChat() {
     if (autoScrollRef.current) {
       el.scrollTop = el.scrollHeight;
     }
-  }, [messages, streamingContent, streamingTools, pendingTool]);
+  }, [messages, streamingContent, streamingTools, pendingTool, streamingSources, sourcesLoading]);
 
   // Auto-resize textarea
   const handleTextareaChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -286,6 +316,7 @@ export default function GridChat() {
 
       let fullContent = '';
       const tools: ToolCallMeta[] = [];
+      let collectedSources: SourceCitation[] = [];
 
       try {
         const response = await fetch('/api/chat', {
@@ -356,10 +387,19 @@ export default function GridChat() {
                   fullContent += event.content;
                   setStreamingContent(fullContent);
                   break;
+                case 'sources_loading':
+                  setSourcesLoading(true);
+                  break;
+                case 'sources':
+                  collectedSources = event.sources;
+                  setStreamingSources(event.sources);
+                  setSourcesLoading(false);
+                  break;
                 case 'quota':
                   setRemaining(event.remaining);
                   break;
                 case 'done':
+                  setSourcesLoading(false);
                   break;
               }
             } catch {
@@ -374,6 +414,7 @@ export default function GridChat() {
           content: fullContent,
           timestamp: Date.now(),
           toolCalls: tools.length > 0 ? tools : undefined,
+          sources: collectedSources.length > 0 ? collectedSources : undefined,
         };
 
         setMessages((prev) => [...prev, assistantMessage]);
@@ -405,7 +446,11 @@ export default function GridChat() {
         setStreamingContent('');
         setStreamingTools([]);
         setPendingTool(null);
+        setStreamingSources([]);
+        setSourcesLoading(false);
         abortControllerRef.current = null;
+        setSuggestionsVisible(true);
+        setSuggestions(getRandomSuggestedQuestions());
       }
     },
     [messages, loading]
@@ -463,9 +508,16 @@ export default function GridChat() {
           {streamingContent && (
             <div
               className={styles.messageContent}
-              dangerouslySetInnerHTML={{ __html: renderMarkdown(streamingContent) }}
+              dangerouslySetInnerHTML={{ __html: renderMarkdown(stripSourceLines(streamingContent)) }}
             />
           )}
+          {sourcesLoading && (
+            <div className={styles.sourcesLoading}>
+              <span className={styles.toolSpinner} />
+              Retrieving sources...
+            </div>
+          )}
+          {streamingSources.length > 0 && <SourcesPanel sources={streamingSources} />}
         </div>
       )}
 

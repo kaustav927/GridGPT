@@ -183,7 +183,7 @@ export default function Dashboard() {
           <PanelWrapper title="GRID AI" className={styles.panelGridAI} bodyClassName={styles.chatPanelBody} dataTour="grid-ai" headerTooltip={<div>AI assistant that answers questions about the grid using natural language.</div>}>
             <GridChat />
           </PanelWrapper>
-          <PanelWrapper title="INTERTIES" className={styles.panelInterties} dataTour="interties" headerTooltip={<div>Power flows between Ontario and neighbouring regions.<br/><a href="https://reports-public.ieso.ca/public/IntertieScheduleFlow/" target="_blank" rel="noopener noreferrer" style={{color:'#58A6FF'}}>IESO Intertie Flow Report →</a></div>}>
+          <PanelWrapper title="INTERTIES" className={styles.panelInterties} dataTour="interties" headerTooltip={<div>Power flows between Ontario and neighbouring regions.<br/><span style={{color:'#3FB950'}}>Green</span> = exporting, <span style={{color:'#F85149'}}>red</span> = importing.<br/><a href="https://reports-public.ieso.ca/public/IntertieScheduleFlow/" target="_blank" rel="noopener noreferrer" style={{color:'#58A6FF'}}>IESO Intertie Flow Report →</a></div>}>
             <Interties />
           </PanelWrapper>
         </div>

@@ -57,20 +57,20 @@ Use the URL patterns below. Only Realtime Zonal Prices uses YYYYMMDDHH (date + h
 For multi-day queries (week-over-week, trends), link to the most recent day's report file rather than listing every day.
 - Realtime Zonal Prices (per hour): https://reports-public.ieso.ca/public/RealtimeZonalEnergyPrices/PUB_RealtimeZonalEnergyPrices_YYYYMMDDHH.xml
 - Generator Output (latest): https://reports-public.ieso.ca/public/GenOutputCapability/PUB_GenOutputCapability.xml
-- Fuel Mix hourly (daily): https://reports-public.ieso.ca/public/GenOutputbyFuelHourly/PUB_GenOutputbyFuelHourly_YYYYMMDD.xml
+- Fuel Mix hourly (yearly file, not daily): https://reports-public.ieso.ca/public/GenOutputbyFuelHourly/PUB_GenOutputbyFuelHourly_YYYY.xml
 - Intertie Flow (daily): https://reports-public.ieso.ca/public/IntertieScheduleFlow/PUB_IntertieScheduleFlow_YYYYMMDD.xml
 - Adequacy Forecast (daily): https://reports-public.ieso.ca/public/Adequacy3/PUB_Adequacy3_YYYYMMDD.xml
 - Day-Ahead Zonal Prices (daily): https://reports-public.ieso.ca/public/DAHourlyZonal/PUB_DAHourlyZonal_YYYYMMDD.xml
 - Day-Ahead Ontario Price (daily): https://reports-public.ieso.ca/public/DAHourlyOntarioZonalPrice/PUB_DAHourlyOntarioZonalPrice_YYYYMMDD.xml
-- Realtime Demand (daily CSV): https://reports-public.ieso.ca/public/RealtimeDemandZonal/PUB_RealtimeDemandZonal_YYYYMMDD.csv
+- Realtime Demand (yearly file, not daily): https://reports-public.ieso.ca/public/RealtimeDemandZonal/PUB_RealtimeDemandZonal_YYYY.csv
 Example: For Feb 06, 2026 Hour 15 prices → https://reports-public.ieso.ca/public/RealtimeZonalEnergyPrices/PUB_RealtimeZonalEnergyPrices_2026020615.xml
 
-CRITICAL: The YYYYMMDD in DA report URLs is the PUBLICATION date (when the report was released), NOT the delivery_date.
-- DA reports are published daily ~1:30 PM EST. The report published on Feb 12 contains delivery_date = Feb 13.
-- To link to "today's settlement prices" (delivery_date = today), use YYYYMMDD = yesterday's date in the URL.
-- To link to "tomorrow's DA forecast" (delivery_date = tomorrow), use YYYYMMDD = today's date in the URL.
-- Example: For delivery_date 2026-02-13, the report was published on 2026-02-12, so URL uses 20260212.
-- For Adequacy3, the date logic is the same: publication date, not delivery date.
+CRITICAL: The YYYYMMDD in DA report URLs is the DELIVERY DATE (the date the prices are for), NOT the publication date.
+- DA reports are published daily ~1:30 PM EST for the next day. The report published on Feb 14 has YYYYMMDD = 20260215 (delivery = Feb 15).
+- To link to "today's settlement prices" (delivery_date = today), use YYYYMMDD = today's date in the URL.
+- To link to "tomorrow's DA forecast" (delivery_date = tomorrow), use YYYYMMDD = tomorrow's date in the URL.
+- Example: For delivery_date 2026-02-16, URL uses 20260216 (even though it was published on Feb 15).
+- For Adequacy3, the same logic applies: YYYYMMDD = delivery date.
 - For RT Zonal Prices, Fuel Mix, Intertie Flow, and other non-DA reports, YYYYMMDD matches the actual data date (no offset).
 
 ### Ontario Electricity Pricing (Single Schedule Market, effective May 2025)

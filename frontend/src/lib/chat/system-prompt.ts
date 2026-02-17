@@ -2,7 +2,42 @@ import { formatSchemaForPrompt } from './schema';
 import { DOMAIN_KNOWLEDGE } from './domain-knowledge';
 import { QUERY_PATTERNS } from './query-patterns';
 
+function pad(n: number): string {
+  return n.toString().padStart(2, '0');
+}
+
 export function buildSystemPrompt(): string {
+  // IESO uses EST year-round (UTC-5, no DST)
+  const nowUTC = new Date();
+  const estMs = nowUTC.getTime() - 5 * 60 * 60 * 1000;
+  const estNow = new Date(estMs);
+
+  const y = estNow.getUTCFullYear();
+  const m = pad(estNow.getUTCMonth() + 1);
+  const d = pad(estNow.getUTCDate());
+  const todayYMD = `${y}${m}${d}`;
+
+  const yesterdayDate = new Date(estMs - 86_400_000);
+  const yesterdayYMD = `${yesterdayDate.getUTCFullYear()}${pad(yesterdayDate.getUTCMonth() + 1)}${pad(yesterdayDate.getUTCDate())}`;
+
+  // Hour-ending convention: HE 1-24 (HE 1 = 00:00–01:00)
+  const hourEnding = estNow.getUTCHours() + 1;
+  const hourEndingHH = pad(hourEnding);
+
+  const BASE = 'https://reports-public.ieso.ca/public';
+  const dateContext = `## Current Date Context (EST)
+Today is ${y}-${m}-${d} (EST), hour-ending ${hourEnding}.
+Use these pre-built URLs when citing sources — do NOT guess dates:
+- **RT Zonal Prices (current hour):** ${BASE}/RealtimeZonalEnergyPrices/PUB_RealtimeZonalEnergyPrices_${todayYMD}${hourEndingHH}.xml
+- **Fuel Mix (yearly file):** ${BASE}/GenOutputbyFuelHourly/PUB_GenOutputbyFuelHourly_${y}.xml
+- **Intertie Flow (today):** ${BASE}/IntertieScheduleFlow/PUB_IntertieScheduleFlow_${todayYMD}.xml
+- **Adequacy (today's delivery):** ${BASE}/Adequacy3/PUB_Adequacy3_${todayYMD}.xml
+- **DA Ontario Zonal Price (today's delivery):** ${BASE}/DAHourlyOntarioZonalPrice/PUB_DAHourlyOntarioZonalPrice_${todayYMD}.xml
+- **DA Zonal Prices (today's delivery):** ${BASE}/DAHourlyZonal/PUB_DAHourlyZonal_${todayYMD}.xml
+- **RT Demand (yearly file):** ${BASE}/RealtimeDemandZonal/PUB_RealtimeDemandZonal_${y}.csv
+- **Generator Output (undated):** ${BASE}/GenOutputCapability/PUB_GenOutputCapability.xml
+For yesterday's RT/fuel data, use YYYYMMDD = ${yesterdayYMD}. For DA reports, YYYYMMDD always matches the delivery date (today = ${todayYMD}, yesterday = ${yesterdayYMD}).`;
+
   return `You are the Ontario Grid Cockpit AI assistant. You help users understand Ontario's electricity grid using real-time data stored in ClickHouse.
 
 ## Your Capabilities
@@ -21,6 +56,8 @@ export function buildSystemPrompt(): string {
 - Never present data for a date or time the user did not ask about. If asked about "right now" or "current", use the latest available data and explicitly state its timestamp.
 - If you receive a ClickHouse error about a missing column, do NOT retry with a guessed column name. Refer to the schema above for correct column names.
 - DA-OZP delivery_date: When users ask about "today's prices", "current prices", or "the DA price", query delivery_date = toDate(subtractHours(now(), 5)) — these are the prices in effect now. NEVER use delivery_date = today + 1 unless the user explicitly asks for "tomorrow" or "the next delivery day". The report published today ~1:30 PM contains tomorrow's delivery_date — do not confuse "latest published" with "currently in effect".
+
+${dateContext}
 
 ## Database Schema
 
@@ -42,10 +79,11 @@ ${QUERY_PATTERNS}
 - CRITICAL: ALL times shown to the user MUST be in Eastern Time (ET). Never display UTC times. Most table timestamps are already in EST — display them directly. For v_intertie_flow (which stores UTC), convert to ET with subtractHours(timestamp, 5) before displaying. When stating data freshness, write e.g. "Data as of Feb 12, 2026 6:55 PM ET" — never "UTC".
 - CRITICAL: ClickHouse now() is UTC. For time filters on EST-stored tables, use subtractHours(now(), 5) as the base, e.g. WHERE timestamp > subtractHours(now(), 5) - INTERVAL 1 HOUR. Using bare now() will miss all recent data due to a 5-hour offset.
 - Current delivery hour (hour-ending) = toHour(subtractHours(now(), 5)) + 1. Do NOT confuse this with the hour showing the highest price.
-- When presenting data, include a direct link to the specific IESO report file (with the correct date/hour substituted into the URL pattern from domain knowledge) so users can verify against the official source.
-- Format source links as: "Source: [Report Name](URL)" — link to the exact file, not the catalogue page. Only RT Zonal Prices uses YYYYMMDDHH in the URL; all other reports use YYYYMMDD. GenOutputCapability uses an undated URL (PUB_GenOutputCapability.xml, no YYYYMMDD suffix). For multi-day queries, link to the latest day's report.
+- Do NOT include source links, citations, or "Source:" lines in your response text. Sources are reported separately via the cite_sources tool and displayed in a dedicated panel.
 - For price questions ("what's the price?", "how much?", daily/hourly comparisons), use DA-OZP (v_da_ozp) as the primary settlement price — NOT averaged RT 5-minute prices.
 - Use RT 5-minute prices (v_zonal_prices) only for: real-time snapshots, congestion monitoring, spike detection, and DA-vs-RT spread analysis.
 - When reporting RT spikes, always note that these are 5-minute monitoring prices, not settlement prices, and mention the corresponding DA-OZP for context.
-- When using query_clickhouse, ALWAYS provide a strategy field explaining your query approach in plain English (1-2 sentences). Example: "Looking up the latest 5-minute prices for each zone to find the current snapshot."`;
+- When using query_clickhouse, ALWAYS provide a strategy field explaining your query approach in plain English (1-2 sentences). Example: "Looking up the latest 5-minute prices for each zone to find the current snapshot."
+- CRITICAL: After answering, ALWAYS call the cite_sources tool exactly once with every IESO report URL you referenced. Use the pre-built URLs from the Current Date Context section. Each source needs a human-readable name and the full URL. Do not skip this step.
+- If your answer references the same report type across multiple dates, create a separate cite_sources entry for each date, with the date in the name (e.g. "RT Zonal Prices – Feb 14 HE 15", "RT Zonal Prices – Feb 15 HE 10") and each with the correct date-specific URL. For yearly reports (Fuel Mix, RT Demand), only one entry is needed since the URL doesn't change.`;
 }

@@ -25,6 +25,29 @@ const TOOL_DEFINITION: Anthropic.Tool = {
   },
 };
 
+const CITE_SOURCES_TOOL: Anthropic.Tool = {
+  name: 'cite_sources',
+  description: 'Report the IESO data sources used in your response. Call this ONCE as your final action. If the same report type was used for multiple dates, create a SEPARATE entry for each date with the date included in the name (e.g. "RT Zonal Prices (Feb 14, 2026 HE 15)"). Each entry must have a valid URL with the correct date substituted.',
+  input_schema: {
+    type: 'object' as const,
+    properties: {
+      sources: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            name: { type: 'string', description: 'Report name, e.g. "DA Ontario Zonal Price"' },
+            url: { type: 'string', description: 'Full URL to the IESO report file' },
+          },
+          required: ['name', 'url'],
+        },
+        description: 'IESO report sources referenced in your answer',
+      },
+    },
+    required: ['sources'],
+  },
+};
+
 const MAX_TOOL_ITERATIONS = 3;
 const MAX_RESULT_ROWS = 100;
 const RATE_LIMIT_PER_DAY = 5;
@@ -121,7 +144,7 @@ export async function POST(request: Request) {
         while (iterations < MAX_TOOL_ITERATIONS) {
           const apiStream = anthropic.messages.stream({
             model: 'claude-sonnet-4-20250514',
-            max_tokens: 1024,
+            max_tokens: 2048,
             system: systemPrompt,
             messages: currentMessages,
             tools: [TOOL_DEFINITION],
@@ -203,7 +226,7 @@ export async function POST(request: Request) {
         if (iterations >= MAX_TOOL_ITERATIONS) {
           const fallbackStream = anthropic.messages.stream({
             model: 'claude-sonnet-4-20250514',
-            max_tokens: 1024,
+            max_tokens: 2048,
             system: systemPrompt,
             messages: [
               ...currentMessages,
@@ -214,6 +237,30 @@ export async function POST(request: Request) {
             send({ type: 'text_delta', content: text });
           });
           await fallbackStream.finalMessage();
+        }
+
+        // Dedicated cite_sources call — always fires after response is complete
+        send({ type: 'sources_loading' });
+        try {
+          const sourcesResponse = await anthropic.messages.create({
+            model: 'claude-sonnet-4-20250514',
+            max_tokens: 256,
+            system: systemPrompt,
+            messages: currentMessages,
+            tools: [CITE_SOURCES_TOOL],
+            tool_choice: { type: 'tool', name: 'cite_sources' },
+          });
+          const sourceBlock = sourcesResponse.content.find(
+            (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use'
+          );
+          if (sourceBlock) {
+            const input = sourceBlock.input as unknown as {
+              sources: Array<{ name: string; url: string }>;
+            };
+            send({ type: 'sources', sources: input.sources || [] });
+          }
+        } catch {
+          // Sources are optional — don't fail the response
         }
 
         send({ type: 'done' });

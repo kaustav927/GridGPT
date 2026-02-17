@@ -80,6 +80,116 @@ const snapToGdpsTime = (date: Date | null): string | undefined => {
   return d.toISOString().split(".")[0] + "Z";
 };
 
+// IESO has more physical intertie points than map polylines for QC/NY
+const IESO_INTERTIE_COUNTS: Record<string, number> = {
+  'QUEBEC': 9, 'NEW-YORK': 2, 'MICHIGAN': 1, 'MINNESOTA': 1, 'MANITOBA': 2,
+};
+
+function applyFlowToPolylines(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  polylineRefs: Map<string, { visible: any; hit: any }>,
+  intertiePrices: Record<string, number>,
+  flowByGroup: Record<string, { mw: number; lastUpdated: string }>,
+  isFuture: boolean,
+  daPrices: Record<string, number>,
+  rtPrices: Record<string, number>,
+): void {
+  const prices = isFuture ? daPrices : (Object.keys(rtPrices).length > 0 ? rtPrices : intertiePrices);
+
+  INTERTIES.forEach((intertie) => {
+    const ref = polylineRefs.get(intertie.flowKey + ":" + intertie.name);
+    if (!ref) return;
+    const { visible, hit } = ref;
+
+    // Future time: white dashed lines with DA LMP tooltip only
+    if (isFuture) {
+      const daLmp = prices[intertie.flowKey];
+      const daLmpLine = daLmp !== undefined
+        ? `<div style="color: #D29922; font-weight: 600; margin-top: 2px;">Forecasted Price: $${daLmp.toFixed(2)}</div>`
+        : `<div style="color: #8B949E; margin-top: 2px;">Forecasted Price: N/A</div>`;
+
+      const style = {
+        color: '#FFFFFF',
+        opacity: 0.6,
+        dashArray: '6, 6',
+        weight: 4,
+      };
+      visible.setStyle(style);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (visible as any)._currentStyle = style;
+
+      hit.setTooltipContent(
+        `<div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 8px; background: #161B22; border: 1px solid #30363D;">
+          <div style="font-weight: 600; color: #E6EDF3; margin-bottom: 4px;">${intertie.name}</div>
+          <div style="color: #8B949E; font-weight: 600;">FORECAST</div>
+          ${daLmpLine}
+          <div style="color: #8B949E; font-size: 9px; margin-top: 2px;">Source: IESO DAHourlyIntertieLMP</div>
+        </div>`,
+      );
+      return;
+    }
+
+    const entry = flowByGroup[intertie.flowKey];
+    const mw = entry?.mw ?? 0;
+    const isExport = mw > 0;
+    const hasFlow = Math.abs(mw) > 1;
+
+    const lineColor = hasFlow
+      ? isExport
+        ? "#3FB950"
+        : "#F85149"
+      : "#F0883E";
+    const dirLabel = hasFlow ? (isExport ? "EXPORT" : "IMPORT") : "NO FLOW";
+    const dirColor = hasFlow
+      ? isExport
+        ? "#3FB950"
+        : "#F85149"
+      : "#8B949E";
+
+    const asOf = entry?.lastUpdated
+      ? new Date(entry.lastUpdated.replace(" ", "T") + "Z").toLocaleString(
+          undefined,
+          {
+            timeZone: "America/Toronto",
+            month: "short",
+            day: "numeric",
+            hour: "numeric",
+            minute: "2-digit",
+          },
+        )
+      : "";
+
+    // LMP price line
+    const lmp = prices[intertie.flowKey];
+    const iesoCount = IESO_INTERTIE_COUNTS[intertie.flowKey] ?? 1;
+    const isAggregate = iesoCount > 1;
+    const lmpLine = lmp !== undefined
+      ? `<div style="color: #D29922; font-weight: 600; margin-top: 2px;">${isAggregate ? "Avg " : ""}Price: $${lmp.toFixed(2)}${isAggregate ? ` (${iesoCount} interties)` : ""}</div>`
+      : "";
+
+    const style = {
+      color: lineColor,
+      opacity: hasFlow ? 0.5 : 0.5,
+      dashArray: hasFlow ? "6, 8" : "8, 6",
+      weight: hasFlow ? 3 : 4,
+    };
+    visible.setStyle(style);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (visible as any)._currentStyle = style;
+
+    hit.setTooltipContent(
+      `<div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 8px; background: #161B22; border: 1px solid #30363D;">
+        <div style="font-weight: 600; color: #E6EDF3; margin-bottom: 4px;">${intertie.name}</div>
+        <div style="color: ${dirColor}; font-weight: 600;">${dirLabel} ${hasFlow ? (isAggregate ? "Total " : "") + Math.abs(mw).toFixed(0) + " MW" : ""}</div>
+        ${hasFlow ? `<div style="color: #8B949E; font-size: 9px; margin-top: 2px;">Flow: IESO IntertieScheduleFlow</div>` : ""}
+        ${lmpLine}
+        ${lmpLine ? `<div style="color: #8B949E; font-size: 9px; margin-top: 2px;">Price: IESO RealTimeIntertieLMP</div>` : ""}
+        ${asOf ? `<div style="color: #8B949E; font-size: 10px; margin-top: 4px;">as of ${asOf}</div>` : ""}
+      </div>`,
+    );
+  });
+}
+
 // Bounds covering Ontario + surrounding region to avoid global tile requests
 const WMS_BOUNDS: [[number, number], [number, number]] = [
   [40, -96],
@@ -189,6 +299,12 @@ function MapContent({
   const animationFrameRef = useRef<number | null>(null);
   const intertiePriceRef = useRef<Record<string, number>>({});
   const ontarioBoundsRef = useRef<L.LatLngBounds | null>(null);
+  const latestFlowDataRef = useRef<{
+    flowByGroup: Record<string, { mw: number; lastUpdated: string }>;
+    isFuture: boolean;
+    daPrices: Record<string, number>;
+    rtPrices: Record<string, number>;
+  } | null>(null);
   const [mapReady, setMapReady] = useState(false);
 
   useEffect(() => {
@@ -456,6 +572,89 @@ function MapContent({
     loadLayer();
   }, [mapReady, showGeneration]);
 
+  // Rebuild chevron markers from flow data (called by Effect A and B)
+  const rebuildChevrons = useCallback(
+    async (
+      flowByGroup: Record<string, { mw: number; lastUpdated: string }>,
+      map: L.Map,
+      isFuture = false,
+    ) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const L = (await import("leaflet")) as any;
+
+      // Remove ONLY the chevron layer, not the base layer
+      if (transmissionChevronLayerRef.current) {
+        map.removeLayer(transmissionChevronLayerRef.current);
+        transmissionChevronLayerRef.current = null;
+      }
+
+      // Future time: no chevrons at all — empty ref stops animation loop
+      if (isFuture) {
+        chevronMarkersRef.current = [];
+        return;
+      }
+
+      const chevronLayers: L.Layer[] = [];
+      const newChevrons: typeof chevronMarkersRef.current = [];
+
+      INTERTIES.forEach((intertie) => {
+        const entry = flowByGroup[intertie.flowKey];
+        const mw = entry?.mw ?? 0;
+        const isExport = mw > 0;
+        const hasFlow = Math.abs(mw) > 1;
+
+        if (!hasFlow) return;
+
+        // path[0] = Ontario side, path[1] = external side
+        const from: [number, number] = isExport
+          ? intertie.path[0]
+          : intertie.path[1];
+        const to: [number, number] = isExport
+          ? intertie.path[1]
+          : intertie.path[0];
+        const bearing = getBearing(from[0], from[1], to[0], to[1]);
+        const chevronColor = isExport ? "#3FB950" : "#F85149";
+
+        // Create 3 staggered chevrons per line
+        for (let i = 0; i < 3; i++) {
+          const icon = L.divIcon({
+            html: `<span style="
+            font-size: 16px;
+            font-weight: bold;
+            color: ${chevronColor};
+            text-shadow: 0 0 4px ${chevronColor};
+            transform: rotate(${bearing - 90}deg);
+            display: inline-block;
+            pointer-events: none;
+            line-height: 1;
+          ">&rsaquo;&rsaquo;&rsaquo;</span>`,
+            className: "",
+            iconSize: [20, 20],
+            iconAnchor: [10, 10],
+          });
+
+          const marker = L.marker(from, {
+            icon,
+            interactive: false,
+            keyboard: false,
+          });
+          chevronLayers.push(marker);
+          newChevrons.push({ marker, from, to, offset: i / 3 });
+        }
+      });
+
+      if (chevronLayers.length > 0) {
+        const chevronGroup = L.layerGroup(chevronLayers);
+        chevronGroup.addTo(map);
+        transmissionChevronLayerRef.current = chevronGroup;
+      }
+
+      // Update shared ref — animation loop automatically picks up new markers
+      chevronMarkersRef.current = newChevrons;
+    },
+    [],
+  );
+
   // Effect A — Transmission base layer (static: image overlay + polylines, created once)
   // NO scrubTime dependency — never rebuilds during scrubbing
   useEffect(() => {
@@ -548,231 +747,48 @@ function MapContent({
       const layerGroup = L.layerGroup(layers);
       layerGroup.addTo(map);
       transmissionBaseLayerRef.current = layerGroup;
+
+      // Re-apply cached flow data if available (handles race where data arrived before polylines)
+      const cached = latestFlowDataRef.current;
+      if (cached) {
+        applyFlowToPolylines(polylineRefsRef.current, intertiePriceRef.current,
+          cached.flowByGroup, cached.isFuture, cached.daPrices, cached.rtPrices);
+        rebuildChevrons(cached.flowByGroup, map, cached.isFuture);
+      }
     };
 
     loadBaseLayer();
-  }, [mapReady, showTransmission]);
-
-  // Rebuild chevron markers from flow data (called by Effect B after data fetch)
-  const rebuildChevrons = useCallback(
-    async (
-      flowByGroup: Record<string, { mw: number; lastUpdated: string }>,
-      map: L.Map,
-      isFuture = false,
-    ) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const L = (await import("leaflet")) as any;
-
-      // Remove ONLY the chevron layer, not the base layer
-      if (transmissionChevronLayerRef.current) {
-        map.removeLayer(transmissionChevronLayerRef.current);
-        transmissionChevronLayerRef.current = null;
-      }
-
-      // Future time: no chevrons at all — empty ref stops animation loop
-      if (isFuture) {
-        chevronMarkersRef.current = [];
-        return;
-      }
-
-      const chevronLayers: L.Layer[] = [];
-      const newChevrons: typeof chevronMarkersRef.current = [];
-
-      INTERTIES.forEach((intertie) => {
-        const entry = flowByGroup[intertie.flowKey];
-        const mw = entry?.mw ?? 0;
-        const isExport = mw > 0;
-        const hasFlow = Math.abs(mw) > 1;
-
-        if (!hasFlow) return;
-
-        // path[0] = Ontario side, path[1] = external side
-        const from: [number, number] = isExport
-          ? intertie.path[0]
-          : intertie.path[1];
-        const to: [number, number] = isExport
-          ? intertie.path[1]
-          : intertie.path[0];
-        const bearing = getBearing(from[0], from[1], to[0], to[1]);
-        const chevronColor = isExport ? "#3FB950" : "#F85149";
-
-        // Create 3 staggered chevrons per line
-        for (let i = 0; i < 3; i++) {
-          const icon = L.divIcon({
-            html: `<span style="
-            font-size: 16px;
-            font-weight: bold;
-            color: ${chevronColor};
-            text-shadow: 0 0 4px ${chevronColor};
-            transform: rotate(${bearing - 90}deg);
-            display: inline-block;
-            pointer-events: none;
-            line-height: 1;
-          ">&rsaquo;&rsaquo;&rsaquo;</span>`,
-            className: "",
-            iconSize: [20, 20],
-            iconAnchor: [10, 10],
-          });
-
-          const marker = L.marker(from, {
-            icon,
-            interactive: false,
-            keyboard: false,
-          });
-          chevronLayers.push(marker);
-          newChevrons.push({ marker, from, to, offset: i / 3 });
-        }
-      });
-
-      if (chevronLayers.length > 0) {
-        const chevronGroup = L.layerGroup(chevronLayers);
-        chevronGroup.addTo(map);
-        transmissionChevronLayerRef.current = chevronGroup;
-      }
-
-      // Update shared ref — animation loop automatically picks up new markers
-      chevronMarkersRef.current = newChevrons;
-    },
-    [],
-  );
+  }, [mapReady, showTransmission, rebuildChevrons]);
 
   // Effect B — Flow data fetch (decoupled from rendering, snap-to-hour skip logic)
+  // Runs freely regardless of polyline state; caches data for Effect A to re-apply after polyline creation
   useEffect(() => {
     if (!mapReady || !mapRef.current || !showTransmission) return;
     const map = mapRef.current;
 
-    // Count interties per flowKey for aggregate labeling
-    const intertieCountByKey: Record<string, number> = {};
-    INTERTIES.forEach((i) => {
-      intertieCountByKey[i.flowKey] = (intertieCountByKey[i.flowKey] || 0) + 1;
-    });
-    // IESO has more physical intertie points than map polylines for QC/NY
-    const IESO_INTERTIE_COUNTS: Record<string, number> = {
-      'QUEBEC': 9, 'NEW-YORK': 2, 'MICHIGAN': 1, 'MINNESOTA': 1, 'MANITOBA': 2,
-    };
-
-    // Update polyline styles and tooltips in-place via setStyle() and setTooltipContent()
-    const updatePolylineStyles = (
-      flowByGroup: Record<string, { mw: number; lastUpdated: string }>,
-      isFuture = false,
-      daPrices: Record<string, number> = {},
-      rtPrices: Record<string, number> = {},
-    ) => {
-      const prices = isFuture ? daPrices : (Object.keys(rtPrices).length > 0 ? rtPrices : intertiePriceRef.current);
-
-      INTERTIES.forEach((intertie) => {
-        const ref = polylineRefsRef.current.get(
-          intertie.flowKey + ":" + intertie.name,
-        );
-        if (!ref) return;
-        const { visible, hit } = ref;
-
-        // Future time: white dashed lines with DA LMP tooltip only
-        if (isFuture) {
-          const daLmp = prices[intertie.flowKey];
-          const daLmpLine = daLmp !== undefined
-            ? `<div style="color: #D29922; font-weight: 600; margin-top: 2px;">Forecasted Price: $${daLmp.toFixed(2)}</div>`
-            : `<div style="color: #8B949E; margin-top: 2px;">Forecasted Price: N/A</div>`;
-
-          const style = {
-            color: '#FFFFFF',
-            opacity: 0.6,
-            dashArray: '6, 6',
-            weight: 4,
-          };
-          visible.setStyle(style);
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (visible as any)._currentStyle = style;
-
-          hit.setTooltipContent(
-            `<div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 8px; background: #161B22; border: 1px solid #30363D;">
-              <div style="font-weight: 600; color: #E6EDF3; margin-bottom: 4px;">${intertie.name}</div>
-              <div style="color: #8B949E; font-weight: 600;">FORECAST</div>
-              ${daLmpLine}
-              <div style="color: #8B949E; font-size: 9px; margin-top: 2px;">Source: IESO DAHourlyIntertieLMP</div>
-            </div>`,
-          );
-          return;
-        }
-
-        const entry = flowByGroup[intertie.flowKey];
-        const mw = entry?.mw ?? 0;
-        const isExport = mw > 0;
-        const hasFlow = Math.abs(mw) > 1;
-
-        const lineColor = hasFlow
-          ? isExport
-            ? "#3FB950"
-            : "#F85149"
-          : "#F0883E";
-        const dirLabel = hasFlow ? (isExport ? "EXPORT" : "IMPORT") : "NO FLOW";
-        const dirColor = hasFlow
-          ? isExport
-            ? "#3FB950"
-            : "#F85149"
-          : "#8B949E";
-
-        const asOf = entry?.lastUpdated
-          ? new Date(entry.lastUpdated.replace(" ", "T") + "Z").toLocaleString(
-              undefined,
-              {
-                timeZone: "America/Toronto",
-                month: "short",
-                day: "numeric",
-                hour: "numeric",
-                minute: "2-digit",
-              },
-            )
-          : "";
-
-        // LMP price line
-        const lmp = prices[intertie.flowKey];
-        const iesoCount = IESO_INTERTIE_COUNTS[intertie.flowKey] ?? 1;
-        const isAggregate = iesoCount > 1;
-        const lmpLine = lmp !== undefined
-          ? `<div style="color: #D29922; font-weight: 600; margin-top: 2px;">${isAggregate ? "Avg " : ""}Price: $${lmp.toFixed(2)}${isAggregate ? ` (${iesoCount} interties)` : ""}</div>`
-          : "";
-
-        const style = {
-          color: lineColor,
-          opacity: hasFlow ? 0.5 : 0.5,
-          dashArray: hasFlow ? "6, 8" : "8, 6",
-          weight: hasFlow ? 3 : 4,
-        };
-        visible.setStyle(style);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (visible as any)._currentStyle = style;
-
-        hit.setTooltipContent(
-          `<div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 8px; background: #161B22; border: 1px solid #30363D;">
-            <div style="font-weight: 600; color: #E6EDF3; margin-bottom: 4px;">${intertie.name}</div>
-            <div style="color: ${dirColor}; font-weight: 600;">${dirLabel} ${hasFlow ? (isAggregate ? "Total " : "") + Math.abs(mw).toFixed(0) + " MW" : ""}</div>
-            ${hasFlow ? `<div style="color: #8B949E; font-size: 9px; margin-top: 2px;">Flow: IESO IntertieScheduleFlow</div>` : ""}
-            ${lmpLine}
-            ${lmpLine ? `<div style="color: #8B949E; font-size: 9px; margin-top: 2px;">Price: IESO RealTimeIntertieLMP</div>` : ""}
-            ${asOf ? `<div style="color: #8B949E; font-size: 10px; margin-top: 4px;">as of ${asOf}</div>` : ""}
-          </div>`,
-        );
-      });
-    };
+    // Detect "live" mode: scrubTime is null or within 5 minutes of now
+    const isLive = !scrubTime || (Math.abs(Date.now() - scrubTime.getTime()) < 5 * 60 * 1000);
 
     // Snap scrubTime to nearest hour — intertie data is hourly granularity
     const snappedHour = snapToHour(scrubTime);
-    const isFuture = scrubTime ? scrubTime > new Date() : false;
+    const isFuture = !isLive && scrubTime ? scrubTime > new Date() : false;
 
-    // Include future/past in the skip key so crossing NOW triggers a re-fetch
-    const hourKey = (snappedHour || "current") + (isFuture ? ":f" : ":p");
+    // Live mode: always use a unique key so each refresh fetches fresh data
+    // Scrubbed mode: dedup by hour + future/past state
+    const hourKey = isLive ? `live-${Date.now()}` : (snappedHour || "current") + (isFuture ? ":f" : ":p");
 
-    // Skip fetch if hour + future/past state hasn't changed
-    if (hourKey === lastIntertieHourRef.current) return;
+    // Skip fetch if hour + future/past state hasn't changed (only for scrubbed mode)
+    if (!isLive && hourKey === lastIntertieHourRef.current) return;
     lastIntertieHourRef.current = hourKey;
 
-    // Check cache (60s TTL)
-    const cacheKey = (snappedHour || "current") + (isFuture ? ":future" : "");
-    const cached = intertieFlowCacheRef.current.get(cacheKey);
+    // Check cache (60s TTL) — skip cache for live mode to always get fresh data
+    const cacheKey = isLive ? "live" : (snappedHour || "current") + (isFuture ? ":future" : "");
+    const cached = !isLive ? intertieFlowCacheRef.current.get(cacheKey) : undefined;
     if (cached && Date.now() - cached.fetchedAt < 60000) {
+      // Save to latestFlowDataRef so Effect A can re-apply after polyline creation
+      latestFlowDataRef.current = { flowByGroup: cached.data, isFuture, daPrices: cached.daPrices ?? {}, rtPrices: cached.rtPrices ?? {} };
       // Use cached data: update polyline styles in-place + rebuild chevrons
-      updatePolylineStyles(cached.data, isFuture, cached.daPrices, cached.rtPrices);
+      applyFlowToPolylines(polylineRefsRef.current, intertiePriceRef.current, cached.data, isFuture, cached.daPrices ?? {}, cached.rtPrices ?? {});
       rebuildChevrons(cached.data, map, isFuture);
       return;
     }
@@ -797,13 +813,14 @@ function MapContent({
             }
           }
         } else {
-          // Past/current: fetch flow + RT prices (existing behavior)
-          const flowUrl = scrubTime
-            ? `/api/interties/at-time?timestamp=${scrubTime.toISOString()}`
-            : "/api/interties";
-          const priceUrl = scrubTime
-            ? `/api/interties/prices?timestamp=${scrubTime.toISOString()}`
-            : "/api/interties/prices";
+          // Past/current: fetch flow + RT prices
+          // Live mode uses no-timestamp endpoints (self-referential queries that always find latest data)
+          const flowUrl = isLive
+            ? "/api/interties"
+            : `/api/interties/at-time?timestamp=${scrubTime!.toISOString()}`;
+          const priceUrl = isLive
+            ? "/api/interties/prices"
+            : `/api/interties/prices?timestamp=${scrubTime!.toISOString()}`;
           const [flowRes, priceRes] = await Promise.all([
             fetch(flowUrl),
             fetch(priceUrl),
@@ -837,8 +854,11 @@ function MapContent({
         fetchedAt: Date.now(),
       });
 
-      // Update polyline styles in-place (no layer destruction)
-      updatePolylineStyles(flowByGroup, isFuture, daPrices, rtPrices);
+      // Save to latestFlowDataRef so Effect A can re-apply after polyline creation
+      latestFlowDataRef.current = { flowByGroup, isFuture, daPrices, rtPrices };
+
+      // Update polyline styles in-place (no-op if polylines don't exist yet)
+      applyFlowToPolylines(polylineRefsRef.current, intertiePriceRef.current, flowByGroup, isFuture, daPrices, rtPrices);
 
       // Rebuild only the chevron markers
       if (mapRef.current) {

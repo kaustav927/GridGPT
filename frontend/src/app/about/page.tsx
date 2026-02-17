@@ -76,10 +76,10 @@ export default function AboutPage() {
       <main className={styles.content}>
         <div style={{ width: '100%', maxWidth: '960px', margin: '0 auto 24px', border: '1px solid var(--border-color)', borderRadius: '6px', overflow: 'hidden' }}>
           <Image
-            src="/hero-screenshot.webp"
+            src="/heroImage.webp"
             alt="GridGPT Dashboard — real-time Ontario electricity grid monitoring"
-            width={960}
-            height={540}
+            width={1376}
+            height={768}
             style={{ width: '100%', height: 'auto', display: 'block' }}
             priority
           />
@@ -111,7 +111,7 @@ export default function AboutPage() {
             data using natural language.
           </p>
           <p className={styles.prose}>
-            The project is a full-stack engineering portfolio piece built to demonstrate real-time
+            The project is a full-stack engineering project built to demonstrate real-time
             data pipeline design, time-series analytics, and AI-augmented data exploration. Every
             layer &mdash; from the Python producer that parses IESO XML feeds, to the{' '}
             <a href="#clickhouse">ClickHouse</a> <a href="#olap">OLAP</a> storage, to the{' '}
@@ -402,7 +402,8 @@ export default function AboutPage() {
               A <a href="#text-to-sql">text-to-SQL</a> chatbot powered by the Claude API. Users ask
               natural language questions like &ldquo;What was the average price in Toronto this
               morning?&rdquo; and the system generates validated SQL, executes it against ClickHouse,
-              and streams back the answer with a strategy explanation. Chat history persists in
+              and streams back the answer with a strategy explanation. Responses include IESO source
+              attribution with direct links to the public reports used. Chat history persists in
               localStorage.
             </p>
           </div>
@@ -463,21 +464,27 @@ export default function AboutPage() {
 
           <h3 className={styles.subsectionTitle}>Tool Loop</h3>
           <p className={styles.prose}>
-            The chat API uses Claude&apos;s tool-use capability with a <code>query_clickhouse</code>{' '}
-            tool. On each turn, the model generates SQL plus a plain-English strategy explanation.
-            The SQL passes through a safety validator (SELECT-only, LIMIT required, no system table
-            access) before executing against ClickHouse. If the query returns an error or empty
-            results, the model can retry with corrected SQL for up to 3 iterations.
+            The chat API uses Claude&apos;s tool-use capability with two tools:{' '}
+            <code>query_clickhouse</code> for SQL execution and <code>cite_sources</code> for source
+            attribution. On each turn, the model generates SQL plus a plain-English strategy
+            explanation. The SQL passes through a safety validator (SELECT-only, LIMIT required, no
+            system table access) before executing against ClickHouse. If the query returns an error
+            or empty results, the model can retry with corrected SQL for up to 3 iterations. After
+            answering, the model calls <code>cite_sources</code> to report the IESO data sources
+            used, with direct links to the public reports.
           </p>
 
           <h3 className={styles.subsectionTitle}>SSE Streaming</h3>
           <p className={styles.prose}>
             Results stream to the browser via <a href="#sse">Server-Sent Events</a> with true
-            token-level streaming from the Claude API. The frontend receives four event types:{' '}
+            token-level streaming from the Claude API. The frontend receives seven event types:{' '}
+            <code>quota</code> (remaining daily questions),{' '}
             <code>tool_use</code> (SQL + strategy), <code>tool_result</code> (row count + duration),{' '}
-            <code>text_delta</code> (real-time token-level streaming), and <code>done</code>. The
-            Grid AI component renders tool badges, strategy text, markdown-formatted answers, and
-            persists conversations in localStorage.
+            <code>text_delta</code> (real-time token-level streaming),{' '}
+            <code>sources_loading</code> (citation in progress),{' '}
+            <code>sources</code> (IESO report URLs), and <code>done</code>. The
+            Grid AI component renders tool badges, strategy text, markdown-formatted answers,
+            source citations with report links, and persists conversations in localStorage.
           </p>
 
           {/* Grid AI Architecture Diagram */}
@@ -526,7 +533,7 @@ export default function AboutPage() {
                 <div className={styles.archNodeContent}>
                   <span className={styles.archNodeName}>Claude API</span>
                   <span className={styles.archNodeDesc}>
-                    claude-sonnet-4 with query_clickhouse tool definition
+                    claude-sonnet-4 with query_clickhouse + cite_sources tools
                   </span>
                   <span className={styles.archNodeTech}>max_tokens: 1024, tool loop up to 3 iterations</span>
                 </div>
@@ -826,6 +833,22 @@ docker exec -it clickhouse clickhouse-client \\
               </tbody>
             </table>
           </div>
+        </section>
+
+        {/* Data Retention */}
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>Data Retention</h2>
+          <p className={styles.prose}>
+            ClickHouse tables use TTL policies to automatically purge old data and keep storage
+            bounded. Real-time 5-minute data (zonal prices, demand, generator output, intertie LMP,
+            adequacy, day-ahead prices) is retained for <strong>90 days</strong>. Hourly aggregates
+            (fuel mix, intertie schedule flows) are kept for <strong>1 year</strong>. Weather
+            forecasts from ECCC are purged after <strong>7 days</strong>.
+          </p>
+          <p className={styles.prose}>
+            Grid AI enforces a rate limit of <strong>5 questions per day</strong> per anonymous user,
+            tracked by IP address with a 7-day TTL on the tracking key in Redis.
+          </p>
         </section>
 
         {/* Glossary */}

@@ -1,0 +1,60 @@
+/* Wrapper — fills available space, no max-width squeeze */
+.wrapper {
+  flex: 1;
+}
+
+/* Column header row */
+.columnHeader {
+  display: grid;
+  grid-template-columns: 1fr 110px 100px;
+  gap: 8px;
+  font-size: 11px;
+  color: #E6EDF3;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  padding-bottom: 8px;
+  margin-bottom: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Intertie row — 3-column grid with fixed widths */
+.row {
+  display: grid;
+  grid-template-columns: 1fr 110px 100px;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  padding: 8px 0;
+}
+
+/* Row separator — not on last row */
+.row:not(:last-child) {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* "Avg" label dim styling */
+.avgLabel {
+  color: #8B949E;
+  opacity: 0.6;
+}
+
+/* Footer */
+.footer {
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  margin-top: 10px;
+  padding-top: 10px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+/* Mobile < 768px */
+@media (max-width: 768px) {
+  .row {
+    padding: 6px 0;
+  }
+
+  .footerValue {
+    font-size: clamp(1.2rem, 4vw, 1.8rem);
+  }
+}
