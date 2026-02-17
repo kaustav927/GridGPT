@@ -306,6 +306,7 @@ All data comes from [IESO](#ieso)'s public report server at `https://reports-pub
 
 > **TTL** (Time To Live) — data older than the TTL period is automatically purged from ClickHouse to manage storage.
 
+
 ---
 
 ## Data Retention
