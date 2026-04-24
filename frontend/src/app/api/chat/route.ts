@@ -143,7 +143,7 @@ export async function POST(request: Request) {
 
         while (iterations < MAX_TOOL_ITERATIONS) {
           const apiStream = anthropic.messages.stream({
-            model: 'claude-sonnet-4-20250514',
+            model: 'claude-sonnet-4-6',
             max_tokens: 2048,
             system: systemPrompt,
             messages: currentMessages,
@@ -225,7 +225,7 @@ export async function POST(request: Request) {
         // Fallback: if max iterations hit with no text streamed
         if (iterations >= MAX_TOOL_ITERATIONS) {
           const fallbackStream = anthropic.messages.stream({
-            model: 'claude-sonnet-4-20250514',
+            model: 'claude-sonnet-4-6',
             max_tokens: 2048,
             system: systemPrompt,
             messages: [
@@ -243,7 +243,7 @@ export async function POST(request: Request) {
         send({ type: 'sources_loading' });
         try {
           const sourcesResponse = await anthropic.messages.create({
-            model: 'claude-sonnet-4-20250514',
+            model: 'claude-sonnet-4-6',
             max_tokens: 256,
             system: systemPrompt,
             messages: currentMessages,
