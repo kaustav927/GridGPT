@@ -26,9 +26,10 @@ Request `https://www.gridgpt.ca/api/health`.
 - `status: "ok"` means nothing to do.
 - A table in `data` with `ok: false` means the pipeline is stale. Open or update an issue titled
   **"Data pipeline: stale tables"** listing each table, its `latest` timestamp and `ageMinutes`.
-- `basemap.ok: false` means the map has fallen back to Esri tiles. Open or update an issue titled
-  **"Map: Stadia basemap not authorized"**. The usual cause is that the domain isn't registered in
-  the Stadia Maps dashboard (Authentication > Domains). Include `basemap.status`.
+- `basemap.ok: false` means the keyless Esri Dark Gray tiles used by the map aren't loading. Open or
+  update an issue titled **"Map: Esri basemap tiles failing"** with `basemap.status`. If Esri has
+  started requiring a key (as CARTO did before), say so and suggest self-hosting a Protomaps
+  `.pmtiles` extract of Ontario as the option with no vendor dependency.
 
 Then fetch `https://www.gridgpt.ca/sitemap.xml` and request every URL in it. Each must return 200.
 For each page, also check whether its HTML contains "temporarily unavailable"; if so, list it in the

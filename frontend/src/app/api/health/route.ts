@@ -1,10 +1,9 @@
 // Health check used by the weekly maintenance agent (and any uptime monitor).
-// Reports data freshness per table, whether the basemap tiles load for our domain,
+// Reports data freshness per table, whether the Esri basemap tiles load,
 // and the configured chat model. Returns 503 if any check fails.
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/clickhouse';
 import { CHAT_MODEL } from '@/lib/chat/model';
-import { SITE_URL } from '@/lib/site';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,7 +17,9 @@ const FRESHNESS: Record<string, number> = {
   fuel_mix: 300,
 };
 
-const STADIA_TEST_TILE = 'https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/6/17/23.png';
+// One tile over Ontario from the keyless Esri Dark Gray basemap used by the map.
+const BASEMAP_TEST_TILE =
+  'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/6/23/17';
 
 /** ClickHouse stores naive Ontario-local timestamps ("2026-11-25 14:05:00"); convert to a real instant. */
 const torontoLocalToDate = (stamp: string): Date | null => {
@@ -51,9 +52,7 @@ const checkTable = async (table: string, maxAgeMin: number) => {
 
 const checkBasemap = async () => {
   try {
-    // Stadia authenticates by domain, so present the production site as the referrer.
-    const res = await fetch(STADIA_TEST_TILE, {
-      headers: { Referer: `${SITE_URL}/`, Origin: SITE_URL },
+    const res = await fetch(BASEMAP_TEST_TILE, {
       cache: 'no-store',
       signal: AbortSignal.timeout(8000),
     });
