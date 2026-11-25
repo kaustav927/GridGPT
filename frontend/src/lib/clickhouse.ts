@@ -3,7 +3,12 @@ const CLICKHOUSE_USER = process.env.CLICKHOUSE_USER || 'default';
 const CLICKHOUSE_PASSWORD = process.env.CLICKHOUSE_PASSWORD || '';
 const CLICKHOUSE_DATABASE = process.env.CLICKHOUSE_DATABASE || 'ieso';
 
-export async function query<T>(sql: string): Promise<T[]> {
+export interface QueryOptions {
+  /** Next.js data-cache lifetime in seconds (default 5). Server pages pass their ISR window. */
+  revalidate?: number;
+}
+
+export async function query<T>(sql: string, opts: QueryOptions = {}): Promise<T[]> {
   const url = new URL(CLICKHOUSE_URL);
   url.searchParams.set('default_format', 'JSON');
   url.searchParams.set('database', CLICKHOUSE_DATABASE);
@@ -15,7 +20,7 @@ export async function query<T>(sql: string): Promise<T[]> {
       'Content-Type': 'text/plain',
     },
     body: sql,
-    next: { revalidate: 5 }
+    next: { revalidate: opts.revalidate ?? 5 }
   });
 
   if (!response.ok) {

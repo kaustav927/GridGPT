@@ -1,0 +1,124 @@
+/* One row, three equal cells, always. ~44px tall on desktop, ~58px on tablets and phones.
+   Each cell is a link: corner arrow always visible (phones have no hover), highlight on hover/focus. */
+.bar {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--border-color);
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-primary);
+  font-family: var(--font-geist-mono), 'JetBrains Mono', monospace;
+  flex-shrink: 0;
+}
+
+.cell {
+  position: relative;
+  background: var(--bg-surface);
+  color: inherit;
+  text-decoration: none;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 0 34px 0 16px;
+  height: 44px;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  transition: background 0.15s, box-shadow 0.15s;
+}
+
+.cell:focus-visible {
+  background: var(--bg-elevated);
+  box-shadow: inset 0 -2px 0 var(--accent-blue);
+  outline: none;
+}
+
+.arrow {
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  transition: color 0.15s, transform 0.15s;
+}
+
+.cell:focus-visible .arrow {
+  color: var(--accent-blue);
+  transform: translate(2px, calc(-50% - 2px));
+}
+
+.label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+  align-self: center;
+}
+
+.value {
+  font-size: 18px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  align-self: center;
+}
+
+.sub {
+  font-size: 12px;
+  color: var(--text-muted);
+  align-self: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.green { color: var(--status-green); }
+
+/* Full wording on wide screens, short wording on phones */
+.short { display: none; }
+
+/* Inside a content page: framed like the other sections */
+.framed {
+  border: 1px solid var(--border-color);
+  margin-bottom: 24px;
+}
+
+/* Tablet and phone: label over value over sub; arrow moves to the top-right corner */
+@media (max-width: 1100px) {
+  .cell {
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    gap: 1px;
+    height: 58px;
+    padding: 0 22px 0 12px;
+  }
+  .label, .value, .sub { align-self: flex-start; max-width: 100%; }
+  .label { font-size: 10px; }
+  .value { font-size: 16px; line-height: 1.15; }
+  .sub { font-size: 10px; }
+  .arrow { top: 8px; right: 8px; transform: none; width: 10px; height: 10px; }
+  .cell:focus-visible .arrow { transform: translate(1px, -1px); }
+}
+
+@media (max-width: 480px) {
+  .cell { padding: 0 18px 0 8px; }
+  .label { font-size: 9px; letter-spacing: 0.04em; overflow: hidden; text-overflow: ellipsis; }
+  .value { font-size: 15px; }
+  .long { display: none; }
+  .short { display: inline; }
+  .arrow { right: 6px; }
+}
+
+/* Hover highlight only on devices with a real pointer (avoids "stuck" hover after a tap on phones) */
+@media (hover: hover) {
+  .cell:hover {
+    background: var(--bg-elevated);
+    box-shadow: inset 0 -2px 0 var(--accent-blue);
+  }
+  .cell:hover .arrow { color: var(--accent-blue); transform: translate(2px, calc(-50% - 2px)); }
+}
+@media (hover: hover) and (max-width: 1100px) {
+  .cell:hover .arrow { transform: translate(1px, -1px); }
+}
+
+/* The global link style underlines on hover; tiles signal hover with background + arrow instead */
+.cell:hover, .cell:hover * { text-decoration: none; }

@@ -64,3 +64,57 @@
   .author { display: block; font-size: 10px; }
   .nav { font-size: 11px; gap: 6px; }
 }
+
+/* Consumer guide links (internal links for SEO); wrap instead of overflowing */
+.nav {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  row-gap: 4px;
+}
+
+.guideItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+@media (min-width: 901px) {
+  .guideItem .navLink { font-size: 13px; }
+}
+
+@media (max-width: 900px) {
+  .guideItem { gap: 6px; }
+}
+
+/* Brand + author sit together; on desktop the group keeps the old left/centre spacing */
+.identity {
+  display: flex;
+  align-items: baseline;
+  gap: 24px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.identity .author { white-space: nowrap; }
+
+/* Mobile: stack identity above the links, left-aligned, no dangling separators */
+@media (max-width: 900px) {
+  .footer {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 16px;
+  }
+  .identity { gap: 10px; }
+  .brand { font-size: 13px; }
+  .author { display: inline; font-size: 11px; }
+  .nav {
+    justify-content: flex-start;
+    gap: 6px 8px;
+    font-size: 12px;
+    width: 100%;
+    min-width: 0;
+  }
+  .identity { width: 100%; min-width: 0; flex-wrap: wrap; }
+  .guideItem { flex-wrap: nowrap; }
+}

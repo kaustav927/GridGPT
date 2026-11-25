@@ -1,5 +1,6 @@
-export const TRANSMISSION_IMAGE_URL =
-  'https://www.ieso.ca/localcontent/ontarioenergymap/img/transmission_02.png';
+// Self-hosted copy of IESO's Ontario Energy Map transmission overlay
+// (source: https://www.ieso.ca/localcontent/ontarioenergymap/img/transmission_02.png)
+export const TRANSMISSION_IMAGE_URL = '/transmission-lines.png';
 
 // Bounds matching IESO's Ontario Energy Map overlay positioning
 export const TRANSMISSION_BOUNDS: [[number, number], [number, number]] = [

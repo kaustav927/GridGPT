@@ -173,7 +173,7 @@
   margin: 0 auto;
   overflow: visible;
   flex: 1;
-  min-height: calc(100vh - 48px - 40px - 24px);
+  min-height: calc(100vh - 48px - var(--topbar-h, 0px) - 40px - 24px);
 }
 
 .leftPanel,
@@ -197,7 +197,7 @@
     grid-template-columns: minmax(260px, 23%) 1fr minmax(240px, 21%);
     gap: 10px;
     padding: 10px;
-    min-height: calc(100vh - 48px - 40px - 20px);
+    min-height: calc(100vh - 48px - var(--topbar-h, 0px) - 40px - 20px);
   }
 
   .leftPanel,
@@ -214,7 +214,7 @@
     grid-template-columns: minmax(240px, 22%) 1fr minmax(220px, 20%);
     gap: 8px;
     padding: 8px;
-    min-height: calc(100vh - 48px - 40px - 16px);
+    min-height: calc(100vh - 48px - var(--topbar-h, 0px) - 40px - 16px);
   }
 
   .leftPanel,
@@ -231,7 +231,7 @@
     grid-template-columns: minmax(220px, 21%) 1fr minmax(200px, 19%);
     gap: 6px;
     padding: 6px;
-    min-height: calc(100vh - 48px - 40px - 12px);
+    min-height: calc(100vh - 48px - var(--topbar-h, 0px) - 40px - 12px);
   }
 
   .leftPanel,
@@ -248,7 +248,7 @@
     grid-template-columns: minmax(200px, 20%) 1fr minmax(180px, 18%);
     gap: 5px;
     padding: 5px;
-    min-height: calc(100vh - 48px - 40px - 10px);
+    min-height: calc(100vh - 48px - var(--topbar-h, 0px) - 40px - 10px);
   }
 
   .leftPanel,
@@ -382,8 +382,9 @@
   .leftPanel, .centerPanel, .rightPanel { display: contents; }
 
   /* Panel ordering + sizing */
-  .panelGridAI { order: 1; flex: none; max-height: none; height: 42vh; }
-  .panelMap { order: 2; height: calc(100vh - 64px - 42vh - 24px); }
+  .panelGridAI { order: 2; flex: none; max-height: none; height: 42vh; }
+  /* Tall enough that Ontario fills the map: ~400-560px of map below the panel chrome */
+  .panelMap { order: 1; height: clamp(560px, 80vh, 760px); }
   .panelMarketOverview { order: 3; }
   .panelFuelMix { order: 4; }
   .panelInterties { order: 5; }
@@ -391,4 +392,10 @@
 
   /* Override map aspect ratio for mobile */
   .mapPanelBody { aspect-ratio: auto !important; }
+}
+
+/* Household rates bar under the header: reserve its height so panels still fit the viewport */
+.dashboard:has([data-household-bar]) { --topbar-h: 45px; }
+@media (max-width: 1100px) {
+  .dashboard:has([data-household-bar]) { --topbar-h: 59px; }
 }
