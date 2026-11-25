@@ -350,55 +350,28 @@ function MapContent({
 
       mapRef.current = map;
 
-      // Dark basemap: Stadia Alidade Smooth Dark (authenticated by domain, no key in code), with
-      // Esri Dark Gray as fallback. Stadia answers an unauthorized domain with a 401 whose body is a
-      // "401 Error" PNG; <img> tiles would happily display it, so probe one tile with fetch()
-      // (Stadia sends CORS headers) and only use Stadia when it returns 200.
-      let fallbackAdded = false;
-      const addEsriBasemap = () => {
-        if (fallbackAdded) return;
-        fallbackAdded = true;
-        L.tileLayer(
-          "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
-          {
-            maxZoom: 16,
-            attribution: "Tiles &copy; Esri &mdash; Esri, HERE, Garmin, &copy; OpenStreetMap contributors",
-          },
-        ).addTo(map);
-      };
+      // Dark basemap: Esri Dark Gray Canvas. Keyless, so it can't break the way CARTO's
+      // keyless tiles did (they now serve "API key required" watermarks). Native tiles stop at
+      // zoom 16; Leaflet upscales beyond that.
+      L.tileLayer(
+        "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
+        {
+          maxNativeZoom: 16,
+          maxZoom: 19,
+          attribution: "Tiles &copy; Esri &mdash; Esri, HERE, Garmin, &copy; OpenStreetMap contributors",
+        },
+      ).addTo(map);
 
-      const stadiaAuthorized = await fetch(
-        "https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/6/17/23.png",
-        { signal: AbortSignal.timeout(4000) },
-      )
-        .then((res) => res.ok)
-        .catch(() => false);
-
-      // The probe is async: bail out if the component unmounted meanwhile.
-      if (mapRef.current !== map) return;
-
-      if (!stadiaAuthorized) {
-        addEsriBasemap();
-      } else {
-        const primaryTiles = L.tileLayer(
-          "https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png",
-          {
-            maxZoom: 20,
-            attribution:
-              '&copy; <a href="https://stadiamaps.com/">Stadia Maps</a> &copy; <a href="https://openmaptiles.org/">OpenMapTiles</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-          },
-        ).addTo(map);
-
-        // Network-level failures later on (outage, quota): swap once to Esri.
-        let tileErrors = 0;
-        primaryTiles.on("tileerror", () => {
-          tileErrors += 1;
-          if (tileErrors !== 4) return;
-          map.removeLayer(primaryTiles);
-          addEsriBasemap();
-        });
-      }
-
+      // Place-name labels in their own pane above the zone fills, so towns stay readable.
+      // pointer-events: none keeps clicks and hovers going to the zones and markers underneath.
+      map.createPane("basemapLabels");
+      const labelPane = map.getPane("basemapLabels");
+      labelPane.style.zIndex = "450";
+      labelPane.style.pointerEvents = "none";
+      L.tileLayer(
+        "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}",
+        { pane: "basemapLabels", maxNativeZoom: 16, maxZoom: 19, opacity: 0.85 },
+      ).addTo(map);
 
       // Compute Ontario bounds from GeoJSON for initial view (without adding the layer)
       const boundsLayer = L.geoJSON(ontarioZones as GeoJSON.FeatureCollection);
