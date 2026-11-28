@@ -1,5 +1,6 @@
 import { query } from '@/lib/clickhouse';
 import { NextResponse } from 'next/server';
+import { cachedJson } from '@/lib/api-cache';
 
 interface GeneratorAggRow {
   fuel_type: string;
@@ -41,7 +42,7 @@ export async function GET() {
     // Get the most recent data timestamp across all fuel types
     const dataTimestamp = data.length > 0 ? data[0].data_timestamp : new Date().toISOString();
 
-    return NextResponse.json({
+    return cachedJson({
       data: data.map(row => {
         const utilization = row.capability_mw > 0 ? (row.output_mw / row.capability_mw) * 100 : 0;
         return {

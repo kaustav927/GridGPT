@@ -1,5 +1,6 @@
 import { query } from '@/lib/clickhouse';
 import { NextResponse } from 'next/server';
+import { cachedJson } from '@/lib/api-cache';
 
 interface SupplyHistoryRow {
   timestamp: string;
@@ -45,7 +46,7 @@ export async function GET(request: Request) {
         ORDER BY timestamp ASC, output_mw DESC
       `);
 
-      return NextResponse.json({
+      return cachedJson({
         data,
         hours,
         by_fuel: true,
@@ -104,7 +105,7 @@ export async function GET(request: Request) {
       );
     }
 
-    return NextResponse.json({
+    return cachedJson({
       data: validData,
       hours,
       by_fuel: false,

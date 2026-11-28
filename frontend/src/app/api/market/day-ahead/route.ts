@@ -1,5 +1,6 @@
 import { query } from '@/lib/clickhouse';
 import { NextResponse } from 'next/server';
+import { cachedJson } from '@/lib/api-cache';
 
 interface DaOzpRow {
   delivery_date: string;
@@ -127,7 +128,7 @@ export async function GET(request: Request) {
       }
     }
 
-    return NextResponse.json({
+    return cachedJson({
       data,
       forecastDate: queryDate,
       targetDate,

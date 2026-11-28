@@ -1,5 +1,6 @@
 import { query } from '@/lib/clickhouse';
 import { NextResponse } from 'next/server';
+import { cachedJson } from '@/lib/api-cache';
 
 interface AdequacyRow {
   delivery_date: string;
@@ -59,7 +60,7 @@ export async function GET() {
         : null
     };
 
-    return NextResponse.json(response);
+    return cachedJson(response);
   } catch (error) {
     console.error('ClickHouse error:', error);
     return NextResponse.json(

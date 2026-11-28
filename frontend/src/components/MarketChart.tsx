@@ -15,6 +15,7 @@ import {
 } from 'recharts';
 import styles from './Card.module.css';
 import type { MarketHistoryResponse, DayAheadResponse, PeakDemandResponse } from '@/lib/types';
+import { whenVisible } from '@/lib/poll';
 
 type TimeRange = '1H' | 'Today';
 
@@ -340,7 +341,7 @@ export default function MarketChart() {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 60000);
+    const interval = setInterval(whenVisible(fetchData), 60000);
     return () => clearInterval(interval);
   }, [fetchData]);
 

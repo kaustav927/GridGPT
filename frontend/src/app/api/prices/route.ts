@@ -1,5 +1,6 @@
 import { query } from '@/lib/clickhouse';
 import { NextResponse } from 'next/server';
+import { cachedJson } from '@/lib/api-cache';
 
 interface ZonalPriceRow {
   zone: string;
@@ -23,7 +24,7 @@ export async function GET() {
       ORDER BY zone
     `);
 
-    return NextResponse.json({
+    return cachedJson({
       data,
       timestamp: new Date().toISOString()
     });

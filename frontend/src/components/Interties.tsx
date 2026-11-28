@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Tooltip from './Tooltip';
 import styles from './Interties.module.css';
+import { whenVisible } from '@/lib/poll';
 
 
 interface IntertieRow {
@@ -68,7 +69,7 @@ export default function Interties() {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 30000);
+    const interval = setInterval(whenVisible(fetchData), 30000);
     return () => clearInterval(interval);
   }, [fetchData]);
 

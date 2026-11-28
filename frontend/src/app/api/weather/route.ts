@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { cachedJson } from '@/lib/api-cache';
 import { query } from '@/lib/clickhouse';
 
 export const dynamic = 'force-dynamic';
@@ -34,7 +35,7 @@ export async function GET() {
       ORDER BY zone
     `);
 
-    return NextResponse.json({
+    return cachedJson({
       data,
       timestamp: new Date().toISOString(),
     });
