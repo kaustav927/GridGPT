@@ -2,6 +2,8 @@
 
 Real-time electricity grid monitoring dashboard for Ontario, Canada.
 
+**Live site: [gridgpt.ca](https://www.gridgpt.ca)** · [Electricity price right now](https://www.gridgpt.ca/ontario-electricity-price) · [Generation by fuel](https://www.gridgpt.ca/ontario-electricity-generation-by-fuel) · [Exports to the US](https://www.gridgpt.ca/ontario-electricity-exports) · [Demand today](https://www.gridgpt.ca/ontario-electricity-demand)
+
 `TypeScript` `Next.js 14` `ClickHouse` `Redpanda` `Claude API` `Blueprint.js`
 
 ---
