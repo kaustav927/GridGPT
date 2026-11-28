@@ -14,6 +14,7 @@ import {
 import type { ZoneData, WeatherDataMap, WeatherData } from "@/lib/types";
 import Tooltip from "./Tooltip";
 import TimeScrubber from "./TimeScrubber";
+import { whenVisible } from '@/lib/poll';
 
 // Price-to-color mapping for zone coloring (IESO-aligned 12-tier scale)
 const priceToColor = (price: number | null | undefined): string => {
@@ -1355,8 +1356,8 @@ export default function OntarioMap({ onZoneSelect, selectedZone }: Props) {
     // Only poll when not showing scrubber
     if (showScrubber) return;
 
-    const priceInterval = setInterval(() => fetchZonePrices(), 30000);
-    const weatherInterval = setInterval(() => fetchWeatherData(), 60000);
+    const priceInterval = setInterval(whenVisible(() => fetchZonePrices()), 30000);
+    const weatherInterval = setInterval(whenVisible(() => fetchWeatherData()), 60000);
     return () => {
       clearInterval(priceInterval);
       clearInterval(weatherInterval);

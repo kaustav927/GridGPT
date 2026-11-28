@@ -15,6 +15,7 @@ import {
 import styles from './FuelMix.module.css';
 import cardStyles from './Card.module.css';
 import Tooltip from './Tooltip';
+import { whenVisible } from '@/lib/poll';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -188,7 +189,7 @@ export default function FuelMix() {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 60000);
+    const interval = setInterval(whenVisible(fetchData), 60000);
     return () => clearInterval(interval);
   }, []);
 

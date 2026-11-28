@@ -1,5 +1,6 @@
 import { query } from '@/lib/clickhouse';
 import { NextResponse } from 'next/server';
+import { cachedJson } from '@/lib/api-cache';
 
 interface DemandRow {
   timestamp: string;
@@ -124,7 +125,7 @@ export async function GET(request: Request) {
       );
     }
 
-    return NextResponse.json({
+    return cachedJson({
       demand: demandData,
       gridLoad: gridLoadData,
       price: priceData,

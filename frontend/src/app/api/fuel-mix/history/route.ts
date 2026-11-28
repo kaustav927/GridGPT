@@ -1,5 +1,6 @@
 import { query } from '@/lib/clickhouse';
 import { NextResponse } from 'next/server';
+import { cachedJson } from '@/lib/api-cache';
 
 interface FuelMixHistoryRow {
   timestamp: string;
@@ -30,7 +31,7 @@ export async function GET(request: Request) {
       ORDER BY timestamp ASC
     `);
 
-    return NextResponse.json({
+    return cachedJson({
       data,
       timestamp: new Date().toISOString(),
     });

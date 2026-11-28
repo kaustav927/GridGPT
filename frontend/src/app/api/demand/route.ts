@@ -1,5 +1,6 @@
 import { query } from '@/lib/clickhouse';
 import { NextResponse } from 'next/server';
+import { cachedJson } from '@/lib/api-cache';
 
 interface ZonalDemandRow {
   zone: string;
@@ -28,7 +29,7 @@ export async function GET(request: Request) {
         WHERE timestamp = (SELECT max(timestamp) FROM ieso.zonal_demand)
       `);
 
-      return NextResponse.json({
+      return cachedJson({
         data: data[0] || { total_demand_mw: 0, last_updated: null },
         timestamp: new Date().toISOString()
       });
@@ -46,7 +47,7 @@ export async function GET(request: Request) {
       ORDER BY demand_mw DESC
     `);
 
-    return NextResponse.json({
+    return cachedJson({
       data,
       timestamp: new Date().toISOString()
     });

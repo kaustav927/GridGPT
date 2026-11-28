@@ -1,5 +1,6 @@
 import { query } from '@/lib/clickhouse';
 import { NextResponse } from 'next/server';
+import { cachedJson } from '@/lib/api-cache';
 
 interface DemandHistoryRow {
   timestamp: string;
@@ -42,7 +43,7 @@ export async function GET(request: Request) {
         ORDER BY timestamp ASC
       `);
 
-      return NextResponse.json({
+      return cachedJson({
         data,
         zone: 'ONTARIO',
         hours,
@@ -70,7 +71,7 @@ export async function GET(request: Request) {
       ORDER BY timestamp ASC
     `);
 
-    return NextResponse.json({
+    return cachedJson({
       data,
       zone,
       hours,

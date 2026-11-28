@@ -1,5 +1,6 @@
 import { query } from '@/lib/clickhouse';
 import { NextResponse } from 'next/server';
+import { cachedJson } from '@/lib/api-cache';
 
 interface GeneratorRow {
   generator: string;
@@ -45,7 +46,7 @@ export async function GET(request: Request) {
       LIMIT ${limit}
     `);
 
-    return NextResponse.json({
+    return cachedJson({
       data,
       timestamp: new Date().toISOString()
     });

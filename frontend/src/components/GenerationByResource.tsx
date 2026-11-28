@@ -12,6 +12,7 @@ import {
   Tooltip,
 } from "recharts";
 import styles from "./GenerationByResource.module.css";
+import { whenVisible } from '@/lib/poll';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -199,7 +200,7 @@ export default function GenerationByResource() {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 60000);
+    const interval = setInterval(whenVisible(fetchData), 60000);
     return () => clearInterval(interval);
   }, [fetchData]);
 

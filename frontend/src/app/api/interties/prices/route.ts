@@ -1,5 +1,6 @@
 import { query } from '@/lib/clickhouse';
 import { NextResponse } from 'next/server';
+import { cachedJson } from '@/lib/api-cache';
 
 interface IntertieLmpRow {
   intertie_zone: string;
@@ -33,7 +34,7 @@ export async function GET(request: Request) {
       ORDER BY intertie_zone ASC
     `);
 
-    return NextResponse.json({
+    return cachedJson({
       data,
       timestamp: new Date().toISOString()
     });

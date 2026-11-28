@@ -1,5 +1,6 @@
 import { query } from '@/lib/clickhouse';
 import { NextResponse } from 'next/server';
+import { cachedJson } from '@/lib/api-cache';
 
 interface IntertieFlowRow {
   flow_group: string;
@@ -41,7 +42,7 @@ export async function GET() {
       ORDER BY flow_group
     `);
 
-    return NextResponse.json({
+    return cachedJson({
       data,
       timestamp: new Date().toISOString(),
     });
