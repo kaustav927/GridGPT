@@ -156,7 +156,8 @@ export default function FuelMix() {
       ]);
 
       const fuelJson: ApiResponse = await fuelRes.json();
-      setData(fuelJson.data);
+      // An error response has no `data`; keep the panel rendering instead of crashing the dashboard
+      setData(fuelJson.data ?? []);
       setTotal(fuelJson.total_mw);
       setDataTimestamp(fuelJson.data_timestamp);
 

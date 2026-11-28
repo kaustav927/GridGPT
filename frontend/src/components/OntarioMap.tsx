@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { Icon } from "@blueprintjs/core";
+import "leaflet/dist/leaflet.css";
 import styles from "./Card.module.css";
 import ontarioZones from "@/data/ontario-zones.geojson";
 import { GENERATION_SITES, FUEL_COLORS } from "@/data/generation-sites";
@@ -310,18 +311,29 @@ function MapContent({
   useEffect(() => {
     if (typeof window === "undefined" || !containerRef.current) return;
 
+    // Fit Ontario in the visible map area and never allow zooming out past that view.
+    // Desktop overlays the time scrubber on the bottom of the map, so it needs extra bottom padding;
+    // on mobile the scrubber sits below the map, so padding stays small.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fitToOntario = (map: any, refit: boolean) => {
+      const bounds = ontarioBoundsRef.current;
+      if (!map || !bounds) return;
+      const isMobile = window.innerWidth <= 900;
+      const paddingTopLeft: [number, number] = isMobile ? [8, 8] : [10, 10];
+      const paddingBottomRight: [number, number] = isMobile ? [8, 8] : [10, 60];
+      const size = map.getSize();
+      const padX = paddingTopLeft[0] + paddingBottomRight[0];
+      const padY = paddingTopLeft[1] + paddingBottomRight[1];
+      if (size.x <= padX || size.y <= padY) return; // container not laid out yet
+      const fitZoom = map.getBoundsZoom(bounds, false, [padX, padY]);
+      map.setMinZoom(Math.max(3, fitZoom));
+      if (refit) map.fitBounds(bounds, { paddingTopLeft, paddingBottomRight });
+    };
+
     // Dynamically import Leaflet
     const initMap = async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const L = (await import("leaflet")) as any;
-
-      // Add Leaflet CSS
-      if (!document.querySelector('link[href*="leaflet.css"]')) {
-        const link = document.createElement("link");
-        link.rel = "stylesheet";
-        link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
-        document.head.appendChild(link);
-      }
 
       // Wait for container to be ready
       await new Promise((resolve) => setTimeout(resolve, 100));
@@ -338,23 +350,36 @@ function MapContent({
 
       mapRef.current = map;
 
-      // Add dark tile layer
+      // Dark basemap: Esri Dark Gray Canvas. Keyless, so it can't break the way CARTO's
+      // keyless tiles did (they now serve "API key required" watermarks). Native tiles stop at
+      // zoom 16; Leaflet upscales beyond that.
       L.tileLayer(
-        "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+        "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
         {
-          attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
+          maxNativeZoom: 16,
+          maxZoom: 19,
+          attribution: "Tiles &copy; Esri &mdash; Esri, HERE, Garmin, &copy; OpenStreetMap contributors",
         },
+      ).addTo(map);
+
+      // Place-name labels in their own pane above the zone fills, so towns stay readable.
+      // pointer-events: none keeps clicks and hovers going to the zones and markers underneath.
+      map.createPane("basemapLabels");
+      const labelPane = map.getPane("basemapLabels");
+      labelPane.style.zIndex = "450";
+      labelPane.style.pointerEvents = "none";
+      L.tileLayer(
+        "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}",
+        { pane: "basemapLabels", maxNativeZoom: 16, maxZoom: 19, opacity: 0.85 },
       ).addTo(map);
 
       // Compute Ontario bounds from GeoJSON for initial view (without adding the layer)
       const boundsLayer = L.geoJSON(ontarioZones as GeoJSON.FeatureCollection);
-      ontarioBoundsRef.current = boundsLayer.getBounds();
-      // Asymmetric padding: more on bottom so southern Ontario isn't cut off by time scrubber
-      const isMobile = window.innerWidth <= 900;
-      map.fitBounds(ontarioBoundsRef.current, {
-        paddingTopLeft: isMobile ? [40, 30] : [10, 10],
-        paddingBottomRight: isMobile ? [40, 120] : [10, 60],
-      });
+      const ontarioBounds = boundsLayer.getBounds();
+      ontarioBoundsRef.current = ontarioBounds;
+      fitToOntario(map, true);
+      // Keep panning near Ontario so the map can't drift off to an empty world view
+      map.setMaxBounds(ontarioBounds.pad(0.6));
 
       // Signal that map is ready for layers
       setMapReady(true);
@@ -370,6 +395,8 @@ function MapContent({
       resizeTimeout = setTimeout(() => {
         if (mapRef.current) {
           mapRef.current.invalidateSize();
+          // Container size changed (rotation, expand/collapse): recompute the Ontario minimum zoom
+          fitToOntario(mapRef.current, false);
         }
       }, 200);
     });

@@ -5,7 +5,7 @@
   flex-direction: column;
   flex: 1;
   min-height: 300px;
-  max-height: calc(100vh - 48px - 24px - 280px);
+  max-height: calc(100vh - 48px - var(--topbar-h, 0px) - 24px - 280px);
   overflow: hidden;
 }
 
@@ -492,7 +492,7 @@
 /* Responsive */
 @media (max-width: 1400px) {
   .container {
-    max-height: calc(100vh - 48px - 20px - 240px);
+    max-height: calc(100vh - 48px - var(--topbar-h, 0px) - 20px - 240px);
   }
 
   .message {
@@ -508,7 +508,7 @@
 
 @media (max-width: 1200px) {
   .container {
-    max-height: calc(100vh - 48px - 16px - 200px);
+    max-height: calc(100vh - 48px - var(--topbar-h, 0px) - 16px - 200px);
     min-height: 250px;
   }
 

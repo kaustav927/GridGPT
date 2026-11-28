@@ -3,6 +3,7 @@ import { query, execute } from '@/lib/clickhouse';
 import { buildSystemPrompt } from '@/lib/chat/system-prompt';
 import { validateSQL } from '@/lib/chat/sql-safety';
 import type { ChatMessage } from '@/lib/chat/types';
+import { CHAT_MODEL } from '@/lib/chat/model';
 
 const anthropic = new Anthropic();
 
@@ -143,7 +144,7 @@ export async function POST(request: Request) {
 
         while (iterations < MAX_TOOL_ITERATIONS) {
           const apiStream = anthropic.messages.stream({
-            model: 'claude-sonnet-4-6',
+            model: CHAT_MODEL,
             max_tokens: 2048,
             system: systemPrompt,
             messages: currentMessages,
@@ -160,14 +161,14 @@ export async function POST(request: Request) {
           if (response.stop_reason === 'tool_use') {
             const assistantContent = response.content;
             const toolUseBlock = assistantContent.find(
-              (block): block is Anthropic.ContentBlockParam & { type: 'tool_use'; id: string; name: string; input: Record<string, string> } =>
-                block.type === 'tool_use'
+              (block): block is Anthropic.ToolUseBlock => block.type === 'tool_use'
             );
 
             if (!toolUseBlock) break;
 
-            const sql = toolUseBlock.input.sql;
-            const strategy = toolUseBlock.input.strategy || '';
+            const toolInput = toolUseBlock.input as Record<string, string>;
+            const sql = toolInput.sql;
+            const strategy = toolInput.strategy || '';
 
             // Emit tool_use immediately — user sees strategy + spinner
             send({ type: 'tool_use', name: 'query_clickhouse', sql, strategy });
@@ -225,7 +226,7 @@ export async function POST(request: Request) {
         // Fallback: if max iterations hit with no text streamed
         if (iterations >= MAX_TOOL_ITERATIONS) {
           const fallbackStream = anthropic.messages.stream({
-            model: 'claude-sonnet-4-6',
+            model: CHAT_MODEL,
             max_tokens: 2048,
             system: systemPrompt,
             messages: [
@@ -243,7 +244,7 @@ export async function POST(request: Request) {
         send({ type: 'sources_loading' });
         try {
           const sourcesResponse = await anthropic.messages.create({
-            model: 'claude-sonnet-4-6',
+            model: CHAT_MODEL,
             max_tokens: 256,
             system: systemPrompt,
             messages: currentMessages,
